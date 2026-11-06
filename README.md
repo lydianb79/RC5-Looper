@@ -42,6 +42,9 @@ CC80 pedal (≥64 press / <64 release) · CC81 stop · CC82 undo/redo · CC83 cl
 ### Keyboard
 Space pedal · Esc/S stop · U undo/redo · Delete clear · R rhythm · B variation · T tap · ←/→ memory · ⌘S write · ⌘I import · ⌘E export.
 
+## App icon
+`Resources/AppIcon.icns` is copied into the app bundle by `build_app.sh`. The source artwork is in `Resources/Icon/` (SVG + 1024 px PNG). Run `python3 Tools/make_icon.py` to regenerate it.
+
 ## Architecture
 
 ```
