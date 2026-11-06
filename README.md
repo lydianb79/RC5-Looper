@@ -30,7 +30,7 @@ You can also run `open Package.swift` to work in Xcode. For recording, run the b
 | One shot, reverse | Both. |
 | Tempo: tap / derived from loop, change loop tempo | Tap tempo (**T**). Without rhythm, the tempo is worked out from the loop length. After recording, the tempo stays live: changing it (slider, tap, ±) speeds the loop up or down from 50 % to 200 % and the rhythm follows. **Keep pitch** uses a granular time-stretch; **Varispeed** works like tape, so the pitch follows the speed. You can overdub at any tempo. **Original tempo** returns to the recorded speed. |
 | — | Audio device selection (input/output), input channel selection for multichannel interfaces, and buffer size from 32 to 2048 frames. |
-| 57 rhythm patterns × 2 variations, 7 kits, rhythm reverb | 57 synthesized patterns (Rock, Pop, Funk, Blues, Jazz, Latin, Reggae, Metal, Electronic, Country, odd meters, metronome), each with variations A and B. The 7 kits are Studio, Live, Light, Heavy, Rock, Metal and Electronic. Rhythm reverb included. |
+| 57 rhythm patterns × 2 variations, 7 kits, rhythm reverb | 57 patterns (Rock, Pop, Funk, Blues, Jazz, Latin, Reggae, Metal, Electronic, Country, odd meters, metronome), each with variations A and B. The 7 kits are Studio, Live, Light (brushes), Heavy, Rock, Metal and Electronic (808/909 style). At launch the app renders each kit into multi-layer drum samples in the background, with two alternating takes per drum, stereo cymbals and slight velocity humanisation. They play through a 32-voice engine, so cymbals ring out and the open hi-hat is choked by the closed one. Each kit has its own amount of room reverb. |
 | Loop level / rhythm level | LOOP LEVEL knob (0–200) and rhythm level. |
 | 99 phrase memories (audio + rhythm/kit/settings) | 99 memories in `~/Library/Application Support/Looper/Memories/NN/` (`loop.wav` + `settings.json`). Switching memories with unsaved changes asks first. |
 | USB WAV import / export | Import any audio file (WAV/AIFF/CAF/MP3/M4A; it is resampled) and export as 32-bit float WAV. |
@@ -53,7 +53,8 @@ Sources/Looper
 ├── Audio/
 │   ├── LoopCore.swift           realtime looper: state machine, layers, undo, quantize, fades, latency comp, time-stretch
 │   ├── AudioDevices.swift       Core Audio device list, channel counts, buffer size, latency
-│   ├── RhythmEngine.swift       step sequencer + synthesized drum kit + reverb
+│   ├── RhythmEngine.swift       step sequencer + reverb
+│   ├── DrumSamples.swift        offline drum rendering (DSP) + sample bank + 32-voice player
 │   ├── RhythmLibrary.swift      57 patterns, 7 kits
 │   └── AudioEngineManager.swift AVAudioEngine graph (sink node → core → source node)
 ├── Model/

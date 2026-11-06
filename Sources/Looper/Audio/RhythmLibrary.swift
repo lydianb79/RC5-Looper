@@ -39,31 +39,66 @@ struct PatternDef {
     }
 }
 
-/// Drum kit voicing parameters (plain values so the audio thread can copy them freely).
+/// Drum kit voicing parameters, used to pre-render the kit's samples (see DrumSamples.swift).
 struct KitParams {
-    var kickPitch: Float
-    var kickDecay: Float
-    var kickClick: Float
-    var snareTone: Float
-    var snareDecay: Float
-    var snareNoise: Float
-    var hatDecay: Float
-    var brightness: Float
-    var tomPitch: Float
-    var level: Float
+    var kickFreq: Double      // fundamental (Hz)
+    var kickSweep: Double     // start pitch multiplier of the pitch drop
+    var kickDecay: Double     // body decay (s)
+    var kickClick: Double     // beater click 0…1
+    var kickDrive: Double     // saturation 1…3
+    var snareTone: Double     // shell tone (Hz)
+    var snareDecay: Double    // wire / noise decay (s)
+    var snareNoise: Double    // 0 = all shell, 1 = all wires
+    var snareBrush: Double    // 0 = stick, 1 = brush
+    var hatScale: Double      // metallic frequency scale
+    var hatDecay: Double      // hi-hat decay multiplier
+    var bright: Double        // 0…1 top-end brightness
+    var tomPitch: Double      // tom tuning multiplier
+    var tomDecay: Double      // tom decay (s)
+    var cymbalDecay: Double   // ride/crash decay multiplier
+    var room: Double          // reverb send multiplier
+    var analog: Double        // 0 = acoustic voicing, 1 = drum-machine voicing
 }
 
 enum RhythmLibrary {
     static let kitNames = ["Studio", "Live", "Light", "Heavy", "Rock", "Metal", "Electronic"]
 
     static let kits: [KitParams] = [
-        KitParams(kickPitch: 1.00, kickDecay: 1.0, kickClick: 0.30, snareTone: 1.00, snareDecay: 1.0, snareNoise: 0.80, hatDecay: 1.0, brightness: 0.85, tomPitch: 1.00, level: 1.00),
-        KitParams(kickPitch: 0.95, kickDecay: 1.2, kickClick: 0.20, snareTone: 0.95, snareDecay: 1.3, snareNoise: 0.90, hatDecay: 1.2, brightness: 0.80, tomPitch: 0.95, level: 1.00),
-        KitParams(kickPitch: 1.10, kickDecay: 0.7, kickClick: 0.10, snareTone: 1.10, snareDecay: 0.7, snareNoise: 0.60, hatDecay: 0.8, brightness: 0.90, tomPitch: 1.10, level: 0.80),
-        KitParams(kickPitch: 0.85, kickDecay: 1.4, kickClick: 0.50, snareTone: 0.85, snareDecay: 1.4, snareNoise: 1.00, hatDecay: 1.1, brightness: 0.75, tomPitch: 0.85, level: 1.10),
-        KitParams(kickPitch: 0.95, kickDecay: 1.1, kickClick: 0.40, snareTone: 0.90, snareDecay: 1.2, snareNoise: 0.95, hatDecay: 1.0, brightness: 0.80, tomPitch: 0.90, level: 1.05),
-        KitParams(kickPitch: 1.05, kickDecay: 0.8, kickClick: 0.90, snareTone: 1.00, snareDecay: 1.0, snareNoise: 1.00, hatDecay: 0.9, brightness: 0.90, tomPitch: 1.00, level: 1.10),
-        KitParams(kickPitch: 0.80, kickDecay: 2.2, kickClick: 0.15, snareTone: 1.20, snareDecay: 0.8, snareNoise: 0.70, hatDecay: 0.7, brightness: 0.95, tomPitch: 1.20, level: 1.00),
+        // Studio – tight, punchy, dry
+        KitParams(kickFreq: 52, kickSweep: 3.0, kickDecay: 0.30, kickClick: 0.55, kickDrive: 1.7,
+                  snareTone: 185, snareDecay: 0.17, snareNoise: 0.62, snareBrush: 0,
+                  hatScale: 1.0, hatDecay: 1.0, bright: 0.70, tomPitch: 1.0, tomDecay: 0.42,
+                  cymbalDecay: 1.0, room: 0.8, analog: 0),
+        // Live – open, roomy, longer decays
+        KitParams(kickFreq: 50, kickSweep: 2.8, kickDecay: 0.42, kickClick: 0.35, kickDrive: 1.3,
+                  snareTone: 175, snareDecay: 0.25, snareNoise: 0.66, snareBrush: 0,
+                  hatScale: 0.95, hatDecay: 1.25, bright: 0.60, tomPitch: 0.95, tomDecay: 0.60,
+                  cymbalDecay: 1.3, room: 1.7, analog: 0),
+        // Light – soft kick, brushes on the snare, darker cymbals (jazz / ballads)
+        KitParams(kickFreq: 62, kickSweep: 2.2, kickDecay: 0.22, kickClick: 0.12, kickDrive: 1.05,
+                  snareTone: 200, snareDecay: 0.30, snareNoise: 0.85, snareBrush: 1,
+                  hatScale: 0.9, hatDecay: 0.8, bright: 0.40, tomPitch: 1.12, tomDecay: 0.38,
+                  cymbalDecay: 1.1, room: 1.0, analog: 0),
+        // Heavy – big low kick, fat snare, dark and wide
+        KitParams(kickFreq: 46, kickSweep: 3.4, kickDecay: 0.50, kickClick: 0.60, kickDrive: 2.6,
+                  snareTone: 165, snareDecay: 0.30, snareNoise: 0.70, snareBrush: 0,
+                  hatScale: 0.9, hatDecay: 1.1, bright: 0.55, tomPitch: 0.85, tomDecay: 0.70,
+                  cymbalDecay: 1.4, room: 1.4, analog: 0),
+        // Rock – beater attack, cracking snare, bright crash
+        KitParams(kickFreq: 50, kickSweep: 3.2, kickDecay: 0.36, kickClick: 0.75, kickDrive: 2.0,
+                  snareTone: 195, snareDecay: 0.22, snareNoise: 0.70, snareBrush: 0,
+                  hatScale: 1.0, hatDecay: 1.0, bright: 0.75, tomPitch: 0.95, tomDecay: 0.55,
+                  cymbalDecay: 1.2, room: 1.1, analog: 0),
+        // Metal – clicky tight kick, high snappy snare, bright hats
+        KitParams(kickFreq: 58, kickSweep: 3.6, kickDecay: 0.20, kickClick: 1.0, kickDrive: 2.2,
+                  snareTone: 230, snareDecay: 0.15, snareNoise: 0.65, snareBrush: 0,
+                  hatScale: 1.1, hatDecay: 0.8, bright: 0.90, tomPitch: 1.05, tomDecay: 0.40,
+                  cymbalDecay: 1.0, room: 0.7, analog: 0),
+        // Electronic – 808 boom kick, 909-style snare, analog metallic hats
+        KitParams(kickFreq: 45, kickSweep: 2.3, kickDecay: 0.85, kickClick: 0.25, kickDrive: 1.4,
+                  snareTone: 200, snareDecay: 0.18, snareNoise: 0.55, snareBrush: 0,
+                  hatScale: 1.0, hatDecay: 0.8, bright: 0.80, tomPitch: 1.15, tomDecay: 0.60,
+                  cymbalDecay: 0.9, room: 0.6, analog: 1),
     ]
 
     /// 57 patterns, each with an A and a B variation (B is derived automatically if not given).
