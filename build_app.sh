@@ -16,6 +16,8 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/Looper" "$APP/Contents/MacOS/Looper"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+mkdir -p "$APP/Contents/Resources/Drums"
+cp Resources/Drums/*.wav "$APP/Contents/Resources/Drums/"
 
 # Ad-hoc signature so macOS keeps the microphone permission between launches.
 codesign --force --sign - "$APP"

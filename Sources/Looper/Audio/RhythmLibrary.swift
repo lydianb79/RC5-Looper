@@ -58,6 +58,12 @@ struct KitParams {
     var cymbalDecay: Double   // ride/crash decay multiplier
     var room: Double          // reverb send multiplier
     var analog: Double        // 0 = acoustic voicing, 1 = drum-machine voicing
+    // Recorded samples (Resources/Drums, Karoryfer "Big Rusty Drums", CC0)
+    var sampled = true        // false = fully synthesized kit
+    var snareSet = "snare"    // snare / snare_rim / snare_brush
+    var hatSet = "hat_closed" // hat_closed / hat_brush
+    var pitch = 1.0           // tuning of kick, snare and toms
+    var drive = 1.0           // saturation of kick and snare (1 = clean)
 }
 
 enum RhythmLibrary {
@@ -78,27 +84,27 @@ enum RhythmLibrary {
         KitParams(kickFreq: 62, kickSweep: 2.2, kickDecay: 0.22, kickClick: 0.12, kickDrive: 1.05,
                   snareTone: 200, snareDecay: 0.30, snareNoise: 0.85, snareBrush: 1,
                   hatScale: 0.9, hatDecay: 0.8, bright: 0.40, tomPitch: 1.12, tomDecay: 0.38,
-                  cymbalDecay: 1.1, room: 1.0, analog: 0),
+                  cymbalDecay: 1.1, room: 1.0, analog: 0, snareSet: "snare_brush", hatSet: "hat_brush", pitch: 1.04),
         // Heavy – big low kick, fat snare, dark and wide
         KitParams(kickFreq: 46, kickSweep: 3.4, kickDecay: 0.50, kickClick: 0.60, kickDrive: 2.6,
                   snareTone: 165, snareDecay: 0.30, snareNoise: 0.70, snareBrush: 0,
                   hatScale: 0.9, hatDecay: 1.1, bright: 0.55, tomPitch: 0.85, tomDecay: 0.70,
-                  cymbalDecay: 1.4, room: 1.4, analog: 0),
+                  cymbalDecay: 1.4, room: 1.4, analog: 0, pitch: 0.86, drive: 1.6),
         // Rock – beater attack, cracking snare, bright crash
         KitParams(kickFreq: 50, kickSweep: 3.2, kickDecay: 0.36, kickClick: 0.75, kickDrive: 2.0,
                   snareTone: 195, snareDecay: 0.22, snareNoise: 0.70, snareBrush: 0,
                   hatScale: 1.0, hatDecay: 1.0, bright: 0.75, tomPitch: 0.95, tomDecay: 0.55,
-                  cymbalDecay: 1.2, room: 1.1, analog: 0),
+                  cymbalDecay: 1.2, room: 1.1, analog: 0, snareSet: "snare_rim", drive: 1.25),
         // Metal – clicky tight kick, high snappy snare, bright hats
         KitParams(kickFreq: 58, kickSweep: 3.6, kickDecay: 0.20, kickClick: 1.0, kickDrive: 2.2,
                   snareTone: 230, snareDecay: 0.15, snareNoise: 0.65, snareBrush: 0,
                   hatScale: 1.1, hatDecay: 0.8, bright: 0.90, tomPitch: 1.05, tomDecay: 0.40,
-                  cymbalDecay: 1.0, room: 0.7, analog: 0),
+                  cymbalDecay: 1.0, room: 0.7, analog: 0, snareSet: "snare_rim", pitch: 1.07, drive: 1.4),
         // Electronic – 808 boom kick, 909-style snare, analog metallic hats
         KitParams(kickFreq: 45, kickSweep: 2.3, kickDecay: 0.85, kickClick: 0.25, kickDrive: 1.4,
                   snareTone: 200, snareDecay: 0.18, snareNoise: 0.55, snareBrush: 0,
                   hatScale: 1.0, hatDecay: 0.8, bright: 0.80, tomPitch: 1.15, tomDecay: 0.60,
-                  cymbalDecay: 0.9, room: 0.6, analog: 1),
+                  cymbalDecay: 0.9, room: 0.6, analog: 1, sampled: false),
     ]
 
     /// 57 patterns, each with an A and a B variation (B is derived automatically if not given).

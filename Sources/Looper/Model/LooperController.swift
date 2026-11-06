@@ -19,7 +19,7 @@ enum SideTab: String, CaseIterable, Identifiable {
 
 /// Main-thread brain of the app: pedal logic, memories, settings, MIDI, UI snapshot.
 final class LooperController: ObservableObject {
-    static let version = "1.5"
+    static let version = "1.6"
 
     // MARK: Published UI state
     @Published var settings = MemorySettings.defaults(for: 0) { didSet { applySettings() } }
