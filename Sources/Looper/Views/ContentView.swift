@@ -187,6 +187,13 @@ struct AudioSetupView: View {
                         Text("\(d.name) — \(d.outputChannels) out").tag(d.uid)
                     }
                 }
+                if looper.outputChannelCount > 2 {
+                    Picker("Output channels", selection: $looper.outputPair) {
+                        ForEach(Array(stride(from: 0, to: looper.outputChannelCount, by: 2)), id: \.self) { i in
+                            Text(i + 1 < looper.outputChannelCount ? "Outputs \(i + 1)–\(i + 2)" : "Output \(i + 1) (left only)").tag(i)
+                        }
+                    }
+                }
                 Toggle("Mono input (one input channel on both sides)", isOn: $looper.monoInput)
                 if looper.inputChannelCount > 1 {
                     Picker(looper.monoInput ? "Input channel" : "Left input channel", selection: $looper.inputLeftChannel) {

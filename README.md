@@ -29,7 +29,7 @@ You can also run `open Package.swift` to work in Xcode. For recording, run the b
 | Start: immediate / fade in · Stop: immediate / fade out / loop end | All of them, with adjustable fade time. A second stop press stops right away. |
 | One shot, reverse | Both. |
 | Tempo: tap / derived from loop, change loop tempo | Tap tempo (**T**). Without rhythm, the tempo is worked out from the loop length. After recording, the tempo stays live: changing it (slider, tap, ±) speeds the loop up or down from 50 % to 200 % and the rhythm follows. **Keep pitch** uses a granular time-stretch; **Varispeed** works like tape, so the pitch follows the speed. You can overdub at any tempo. **Original tempo** returns to the recorded speed. |
-| — | Audio device selection (input/output), input channel selection for multichannel interfaces, and buffer size from 32 to 2048 frames. |
+| — | Audio device selection (input/output). On multichannel interfaces you can choose the input channels and the output pair (Outputs 1–2, 3–4, …). Buffer size from 32 to 2048 frames. |
 | 57 rhythm patterns × 2 variations, 7 kits, rhythm reverb | 57 patterns (Rock, Pop, Funk, Blues, Jazz, Latin, Reggae, Metal, Electronic, Country, odd meters, metronome), each with variations A and B. The 7 kits are Studio, Live, Light (brushes), Heavy, Rock (rimshots), Metal and Electronic (synthesized 808/909 style). The acoustic kits play **real multi-mic drum recordings**: Karoryfer *Big Rusty Drums*, CC0, bundled in `Resources/Drums`. Each drum has 3 velocity layers × 2 round-robin takes and is tuned and saturated per kit. Playback uses a 32-voice engine, so cymbals ring out, the closed hi-hat chokes the open one, and each kit has its own room reverb. |
 | Loop level / rhythm level | LOOP LEVEL knob (0–200) and rhythm level. |
 | 99 phrase memories (audio + rhythm/kit/settings) | 99 memories in `~/Library/Application Support/Looper/Memories/NN/` (`loop.wav` + `settings.json`). Switching memories with unsaved changes asks first. |
@@ -76,6 +76,6 @@ Realtime design: the audio thread never allocates or blocks. UI commands go thro
 - Use headphones, or plug a guitar into an audio interface: the built-in mic plus speakers will feed back into the loop.
 - The buffer size is a device setting, so it also affects other apps using the same interface.
 - Different input and output devices run on separate clocks. If they won't start together or drift, combine them into an Aggregate Device in Audio MIDI Setup.
-- Output always goes to outputs 1–2 of the selected device.
+- On interfaces with more than two outputs, choose the output pair on the Audio tab. The other outputs are muted while Looper is running.
 - The memory always stores the loop at its recorded tempo, together with the current tempo. Export WAV writes the loop at its original speed.
 - Keep pitch stretching is a simple granular method. Very large tempo changes can sound slightly phasey; Varispeed sounds clean but shifts the pitch.

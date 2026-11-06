@@ -11,6 +11,8 @@ final class AudioEngineManager {
     private(set) var inputDescription = "—"
     private(set) var outputDescription = "—"
     private(set) var inputChannelCount = 0
+    private(set) var outputChannelCount = 0
+    private(set) var activeOutputPair = 0
     private(set) var activeInputDevice: AudioDeviceID = 0
     private(set) var activeOutputDevice: AudioDeviceID = 0
     private(set) var actualBufferFrames = 0
@@ -22,6 +24,8 @@ final class AudioEngineManager {
     var outputDeviceUID = ""
     /// Requested hardware buffer size in frames (0 = leave the device setting alone).
     var bufferFrames = 0
+    /// First (0-based) device output channel that receives the stereo signal: 0 = outputs 1–2, 2 = outputs 3–4, …
+    var outputPair = 0
 
     init(maxSeconds: Double) {
         let probe = AVAudioEngine()
@@ -136,9 +140,29 @@ final class AudioEngineManager {
         }
 
         let outFmt = engine.outputNode.outputFormat(forBus: 0)
-        outputDescription = "\(AudioDevices.name(outID)) · \(outFmt.channelCount) ch @ \(Int(outFmt.sampleRate)) Hz"
 
+        // 5. Output routing on multichannel interfaces: send L/R to the chosen pair of outputs.
+        let devOut = AudioDevices.channelCount(outID, input: false)
+        outputChannelCount = devOut
+        activeOutputPair = 0
+        var channelMap: [NSNumber]?
+        if devOut > 2 {
+            let first = min(max(0, outputPair), devOut - 1)
+            var map = [NSNumber](repeating: -1, count: devOut)
+            map[first] = 0
+            if first + 1 < devOut { map[first + 1] = 1 }
+            channelMap = map
+            activeOutputPair = first
+        }
+        let routing = devOut > 2
+            ? (activeOutputPair + 1 < devOut ? "outputs \(activeOutputPair + 1)–\(activeOutputPair + 2)" : "output \(activeOutputPair + 1)")
+            : "\(outFmt.channelCount) ch"
+        outputDescription = "\(AudioDevices.name(outID)) · \(routing) @ \(Int(outFmt.sampleRate)) Hz"
+
+        if let channelMap { engine.outputNode.auAudioUnit.channelMap = channelMap }
         engine.prepare()
+        // set again after prepare in case the I/O unit was re-initialised
+        if let channelMap { engine.outputNode.auAudioUnit.channelMap = channelMap }
         core.hostRunning = true
         do {
             try engine.start()

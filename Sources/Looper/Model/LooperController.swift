@@ -19,7 +19,7 @@ enum SideTab: String, CaseIterable, Identifiable {
 
 /// Main-thread brain of the app: pedal logic, memories, settings, MIDI, UI snapshot.
 final class LooperController: ObservableObject {
-    static let version = "1.6"
+    static let version = "1.7"
 
     // MARK: Published UI state
     @Published var settings = MemorySettings.defaults(for: 0) { didSet { applySettings() } }
@@ -54,6 +54,8 @@ final class LooperController: ObservableObject {
     @Published var inputDeviceUID: String { didSet { if inputDeviceUID != oldValue { defaults.set(inputDeviceUID, forKey: "inputDeviceUID"); restartAudio() } } }
     @Published var outputDeviceUID: String { didSet { if outputDeviceUID != oldValue { defaults.set(outputDeviceUID, forKey: "outputDeviceUID"); restartAudio() } } }
     @Published var bufferFrames: Int { didSet { if bufferFrames != oldValue { defaults.set(bufferFrames, forKey: "bufferFrames"); restartAudio() } } }
+    @Published private(set) var outputChannelCount = 0
+    @Published var outputPair: Int { didSet { if outputPair != oldValue { defaults.set(outputPair, forKey: "outputPair"); restartAudio() } } }
     @Published var inputLeftChannel: Int { didSet { defaults.set(inputLeftChannel, forKey: "inputLeftChannel"); applyGlobals() } }
     @Published var inputRightChannel: Int { didSet { defaults.set(inputRightChannel, forKey: "inputRightChannel"); applyGlobals() } }
 
@@ -94,6 +96,7 @@ final class LooperController: ObservableObject {
         inputDeviceUID = d.string(forKey: "inputDeviceUID") ?? ""
         outputDeviceUID = d.string(forKey: "outputDeviceUID") ?? ""
         bufferFrames = d.object(forKey: "bufferFrames") as? Int ?? 0
+        outputPair = d.object(forKey: "outputPair") as? Int ?? 0
         inputLeftChannel = d.object(forKey: "inputLeftChannel") as? Int ?? 0
         inputRightChannel = d.object(forKey: "inputRightChannel") as? Int ?? 1
         audio = AudioEngineManager(maxSeconds: max(1, maxMinutes) * 60)
@@ -151,11 +154,13 @@ final class LooperController: ObservableObject {
         audio.inputDeviceUID = inputDeviceUID
         audio.outputDeviceUID = outputDeviceUID
         audio.bufferFrames = bufferFrames
+        audio.outputPair = outputPair
         do {
             try audio.start(withInput: input)
             audioStatus = "In: \(audio.inputDescription)\nOut: \(audio.outputDescription)\nEngine: \(Int(core.sampleRate)) Hz · buffer \(audio.actualBufferFrames) frames"
             if let e = audio.lastError { audioStatus += "\n⚠︎ \(e)" }
-            deviceSummary = "\(AudioDevices.name(audio.activeInputDevice)) → \(AudioDevices.name(audio.activeOutputDevice)) · \(audio.actualBufferFrames)"
+            let outs = audio.outputChannelCount > 2 ? " \(audio.activeOutputPair + 1)–\(audio.activeOutputPair + 2)" : ""
+            deviceSummary = "\(AudioDevices.name(audio.activeInputDevice)) → \(AudioDevices.name(audio.activeOutputDevice))\(outs) · \(audio.actualBufferFrames)"
             if latencyMs < 0 { latencyMs = (audio.estimatedLatencyMs * 10).rounded() / 10 }
         } catch {
             audioStatus = "Audio failed to start: \(error.localizedDescription)"
@@ -164,6 +169,7 @@ final class LooperController: ObservableObject {
             }
         }
         inputChannelCount = audio.inputChannelCount
+        outputChannelCount = audio.outputChannelCount
         actualBufferFrames = audio.actualBufferFrames
         applyGlobals()
     }
