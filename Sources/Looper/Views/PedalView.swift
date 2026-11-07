@@ -355,6 +355,7 @@ struct DisplayView: View {
                         if looper.settings.oneShot { tag("1SHOT", theme.accent) }
                         if looper.settings.dubMode == .replace { tag("RPL", StateColor.dub) }
                         if looper.settings.quantize && looper.settings.rhythmOn { tag("QTZ", theme.accent) }
+                        if looper.syncExternal { tag(looper.externalClockTempo != nil ? "EXT" : "EXT?", looper.externalClockTempo != nil ? StateColor.play : StateColor.rec) }
                         if snap.canUndo { tag("UNDO", StateColor.dub) }
                         if snap.canRedo { tag("REDO", StateColor.dub) }
                     }
@@ -416,7 +417,7 @@ struct DisplayView: View {
 
     private func stateText(_ s: Snapshot) -> String {
         if s.state == .recording && s.waitingQuantize { return "REC…" }
-        if s.stopping { return "STOP…" }
+        if s.stopping { return looper.settings.rhythmEnding && looper.settings.rhythmOn ? "ENDING" : "STOP…" }
         if s.state == .empty && looper.settings.autoRec { return "READY" }
         return s.state.label
     }

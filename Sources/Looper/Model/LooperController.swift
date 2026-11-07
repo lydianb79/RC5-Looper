@@ -19,7 +19,7 @@ enum SideTab: String, CaseIterable, Identifiable {
 
 /// Main-thread brain of the app: pedal logic, memories, settings, MIDI, UI snapshot.
 final class LooperController: ObservableObject {
-    static let version = "1.7"
+    static let version = "1.8"
 
     // MARK: Published UI state
     @Published var settings = MemorySettings.defaults(for: 0) { didSet { applySettings() } }
@@ -43,6 +43,9 @@ final class LooperController: ObservableObject {
     @Published var monoInput: Bool { didSet { defaults.set(monoInput, forKey: "monoInput"); applyGlobals() } }
     @Published var autoRecThreshold: Double { didSet { defaults.set(autoRecThreshold, forKey: "autoRecThreshold"); applyGlobals() } }
     @Published var midiClockOut: Bool { didSet { defaults.set(midiClockOut, forKey: "midiClockOut") } }
+    @Published var syncExternal: Bool { didSet { defaults.set(syncExternal, forKey: "syncExternal") } }
+    /// Tempo of the incoming MIDI clock, nil when no clock is being received.
+    @Published private(set) var externalClockTempo: Double?
     @Published var maxLoopMinutes: Double { didSet { defaults.set(maxLoopMinutes, forKey: "maxLoopMinutes") } }
 
     // Audio device setup
@@ -76,6 +79,7 @@ final class LooperController: ObservableObject {
     private var messageItem: DispatchWorkItem?
     private var taps: [TimeInterval] = []
     private var audioStarted = false
+    private var lastClockTime: TimeInterval = 0
 
     private enum PedalAction { case none, armed, cancel, finishedRec, startedDub, stoppedDub, play, restart }
     private var lastPedalTime: TimeInterval = 0
@@ -91,6 +95,7 @@ final class LooperController: ObservableObject {
         monoInput = d.object(forKey: "monoInput") as? Bool ?? true
         autoRecThreshold = d.object(forKey: "autoRecThreshold") as? Double ?? 0.05
         midiClockOut = d.object(forKey: "midiClockOut") as? Bool ?? false
+        syncExternal = d.object(forKey: "syncExternal") as? Bool ?? false
         let maxMinutes = d.object(forKey: "maxLoopMinutes") as? Double ?? 10
         maxLoopMinutes = maxMinutes
         inputDeviceUID = d.string(forKey: "inputDeviceUID") ?? ""
@@ -109,6 +114,7 @@ final class LooperController: ObservableObject {
         applyGlobals()
 
         midi.onMessage = { [weak self] s, a, b in self?.handleMIDI(s, a, b) }
+        midi.onClockTempo = { [weak self] t in self?.receivedClockTempo(t) }
         audio.onConfigurationChange = { [weak self] in
             guard let self else { return }
             self.bootEngine(input: self.inputGranted)
@@ -212,6 +218,8 @@ final class LooperController: ObservableObject {
         c.dubMode = settings.dubMode
         c.quantize = settings.quantize
         c.countIn = settings.countIn
+        c.rhythmIntro = settings.rhythmIntro
+        c.rhythmEnding = settings.rhythmEnding
         c.autoRec = settings.autoRec
         c.startMode = settings.startMode
         c.stopMode = settings.stopMode
@@ -418,7 +426,7 @@ final class LooperController: ObservableObject {
         s.inLevel = c.inLevel
         s.outLevel = c.outLevel
         s.waitingQuantize = c.pendingEnd > 0
-        s.stopping = c.stopping || c.stopAtWrap
+        s.stopping = c.stopping || c.stopAtWrap || c.endingPending
         s.rhythmRunning = c.rhythmRunning
         s.tempo = c.tempo
         s.loopTempo = c.loopTempo
@@ -464,7 +472,10 @@ final class LooperController: ObservableObject {
             needWave = false
             updateWaveform()
         }
-        if midiClockOut {
+        if externalClockTempo != nil && ProcessInfo.processInfo.systemUptime - lastClockTime > 1.0 {
+            externalClockTempo = nil
+        }
+        if midiClockOut && !syncExternal {
             let running = s.rhythmRunning || s.state == .playing || s.state == .overdubbing || s.state == .recording
             midi.updateClock(running: running, tempo: c.tempo)
         } else if midi.clockRunning {
@@ -680,7 +691,41 @@ final class LooperController: ObservableObject {
 
     // MARK: MIDI remote control
 
+    /// Tempo follows the external MIDI clock (if Tempo sync = External).
+    private func receivedClockTempo(_ t: Double) {
+        lastClockTime = ProcessInfo.processInfo.systemUptime
+        externalClockTempo = t
+        guard syncExternal, snapshot.state != .recording else { return }
+        let r = tempoRange
+        let v = max(r.lowerBound, min(r.upperBound, t))
+        if abs(v - settings.tempo) >= 0.1 { settings.tempo = v }
+    }
+
+    /// MIDI realtime Start / Continue / Stop from the clock master.
+    private func handleTransport(_ status: UInt8) {
+        guard syncExternal else { return }
+        let st = core.state
+        switch status {
+        case 0xFA:   // Start: from the top
+            if core.loopLength > 0 {
+                core.send(st == .stopped ? .play : .restart)
+            } else if settings.rhythmOn {
+                core.send(.resetRhythm)
+            }
+        case 0xFB:   // Continue
+            if st == .stopped && core.loopLength > 0 { core.send(.play) }
+        case 0xFC:   // Stop
+            if st == .playing || st == .overdubbing { core.send(.stop) }
+        default:
+            break
+        }
+    }
+
     private func handleMIDI(_ status: UInt8, _ d1: UInt8, _ d2: UInt8) {
+        if status >= 0xF8 {
+            handleTransport(status)
+            return
+        }
         let type = status & 0xF0
         switch type {
         case 0x90 where d2 > 0:

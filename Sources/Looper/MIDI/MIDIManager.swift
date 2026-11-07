@@ -12,8 +12,23 @@ final class MIDIManager {
     private var clockTempo: Double = 0
     private(set) var clockRunning = false
     private(set) var available = false
-    /// (status, data1, data2), delivered on the main queue.
+    /// (status, data1, data2), delivered on the main queue. Includes realtime Start (FA), Continue (FB), Stop (FC).
     var onMessage: ((UInt8, UInt8, UInt8) -> Void)?
+    /// Tempo measured from incoming MIDI clock (24 ticks per quarter note), delivered on the main queue.
+    var onClockTempo: ((Double) -> Void)?
+
+    // incoming clock measurement (MIDI thread only)
+    private var tickRing = [UInt64](repeating: 0, count: 25)
+    private var tickWrite = 0
+    private var tickCount = 0
+    private var lastTick: UInt64 = 0
+    private var smoothedTempo = 0.0
+    private var ticksSinceReport = 0
+    private let nsPerHostTick: Double = {
+        var info = mach_timebase_info_data_t()
+        mach_timebase_info(&info)
+        return Double(info.numer) / Double(max(1, info.denom))
+    }()
 
     init() {
         var c = MIDIClientRef()
@@ -57,7 +72,16 @@ final class MIDIManager {
             var status: UInt8 = 0
             while i < bytes.count {
                 let b = bytes[i]
-                if b >= 0xF8 { i += 1; continue }                  // realtime
+                if b >= 0xF8 {                                      // realtime
+                    if b == 0xF8 {
+                        clockTick(packet.pointee.timeStamp)
+                    } else if b == 0xFA || b == 0xFB || b == 0xFC {
+                        if b == 0xFA || b == 0xFC { resetClock() }
+                        messages.append((b, 0, 0))
+                    }
+                    i += 1
+                    continue
+                }
                 if b & 0x80 != 0 {
                     status = b >= 0xF0 ? 0 : b                       // ignore system common / sysex
                     i += 1
@@ -76,6 +100,37 @@ final class MIDIManager {
         guard !messages.isEmpty else { return }
         DispatchQueue.main.async { [weak self] in
             for m in messages { self?.onMessage?(m.0, m.1, m.2) }
+        }
+    }
+
+    private func resetClock() {
+        tickCount = 0
+        tickWrite = 0
+    }
+
+    /// Measures the tempo over the last 24 clock ticks (one quarter note).
+    private func clockTick(_ stamp: MIDITimeStamp) {
+        let t = stamp != 0 ? stamp : mach_absolute_time()
+        if lastTick != 0, t > lastTick, Double(t - lastTick) * nsPerHostTick > 500_000_000 {
+            resetClock()                                    // clock was paused
+        }
+        lastTick = t
+        tickRing[tickWrite] = t
+        tickWrite = (tickWrite + 1) % tickRing.count
+        tickCount += 1
+        guard tickCount >= tickRing.count else { return }
+        let oldest = tickRing[tickWrite]
+        guard t > oldest else { return }
+        let seconds = Double(t - oldest) * nsPerHostTick / 1e9
+        guard seconds > 0 else { return }
+        let bpm = 60.0 / seconds
+        guard bpm > 20 && bpm < 400 else { return }
+        smoothedTempo = smoothedTempo == 0 ? bpm : smoothedTempo * 0.85 + bpm * 0.15
+        ticksSinceReport += 1
+        if ticksSinceReport >= 12 {
+            ticksSinceReport = 0
+            let rounded = (smoothedTempo * 10).rounded() / 10
+            DispatchQueue.main.async { [weak self] in self?.onClockTempo?(rounded) }
         }
     }
 

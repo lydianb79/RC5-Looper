@@ -160,6 +160,22 @@ struct SetupView: View {
                 .pickerStyle(.segmented)
             }
             Section("MIDI") {
+                Picker("Tempo sync", selection: $looper.syncExternal) {
+                    Text("Internal").tag(false)
+                    Text("External MIDI clock").tag(true)
+                }
+                .pickerStyle(.segmented)
+                if looper.syncExternal {
+                    LabeledContent("Incoming clock") {
+                        if let t = looper.externalClockTempo {
+                            Text(String(format: "♩ %.1f", t)).monospacedDigit().foregroundStyle(.green)
+                        } else {
+                            Text("No clock received").foregroundStyle(.secondary)
+                        }
+                    }
+                    Text("The tempo follows the clock (a recorded loop changes speed, 50–200 %). MIDI Start plays from the top, Stop stops, Continue resumes. Clock out is disabled while syncing to an external clock.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Toggle("Send MIDI clock + start/stop on virtual port \"Looper\"", isOn: $looper.midiClockOut)
                 Text("Remote control: CC80 pedal · CC81 stop · CC82 undo · CC83 clear · CC84 rhythm · CC85 variation · CC86 loop level · Notes 60–66 · Program change 0–98 selects memory")
                     .font(.caption).foregroundStyle(.secondary)
@@ -246,6 +262,8 @@ struct RhythmView: View {
         Form {
             Section {
                 Toggle("Rhythm", isOn: $looper.settings.rhythmOn)
+                Toggle("Intro — one bar count + fill before recording starts", isOn: $looper.settings.rhythmIntro)
+                Toggle("Ending — STOP plays a fill and stops on the next bar with a final hit", isOn: $looper.settings.rhythmEnding)
                 LabeledContent("Pattern") {
                     Button { looper.selectPattern((looper.settings.rhythmPattern + RhythmLibrary.patterns.count - 1) % RhythmLibrary.patterns.count) } label: {
                         Image(systemName: "chevron.left")

@@ -79,6 +79,8 @@ struct MemorySettings: Codable, Equatable {
     var rhythmKit = 0
     var rhythmLevel = 0.7
     var rhythmReverb = 0.2
+    var rhythmIntro = false      // one-bar intro (count + fill) before recording
+    var rhythmEnding = false     // fill + final hit when stopping
     var tempo = 120.0
     var loopTempo = 0.0          // tempo the loop audio was recorded at (0 = same as tempo)
     var stretchMode = StretchMode.keepPitch
@@ -88,7 +90,7 @@ struct MemorySettings: Codable, Equatable {
     enum CodingKeys: String, CodingKey {
         case name, recAction, dubMode, quantize, autoRec, countIn, startMode, stopMode, fadeSeconds
         case oneShot, reverse, loopLevel, rhythmOn, rhythmPattern, rhythmVariation, rhythmKit
-        case rhythmLevel, rhythmReverb, tempo, loopTempo, stretchMode, loopMeasures, savedSeconds
+        case rhythmLevel, rhythmReverb, rhythmIntro, rhythmEnding, tempo, loopTempo, stretchMode, loopMeasures, savedSeconds
     }
 
     static func defaults(for slot: Int) -> MemorySettings {
@@ -124,6 +126,8 @@ extension MemorySettings {
         rhythmKit = v(.rhythmKit, rhythmKit)
         rhythmLevel = v(.rhythmLevel, rhythmLevel)
         rhythmReverb = v(.rhythmReverb, rhythmReverb)
+        rhythmIntro = v(.rhythmIntro, rhythmIntro)
+        rhythmEnding = v(.rhythmEnding, rhythmEnding)
         tempo = v(.tempo, tempo)
         loopTempo = v(.loopTempo, loopTempo)
         stretchMode = v(.stretchMode, stretchMode)

@@ -15,6 +15,7 @@ enum LoopCommand {
     case toggleUndo
     case clear
     case setLoaded(length: Int)
+    case resetRhythm
 }
 
 /// The realtime looper engine.
@@ -51,6 +52,8 @@ final class LoopCore {
     var oneShot = false
     var quantize = true
     var countIn = false
+    var rhythmIntro = false
+    var rhythmEnding = false
     var autoRec = false
     var autoRecThreshold: Float = 0.05
     var startMode: StartMode = .immediate
@@ -80,6 +83,7 @@ final class LoopCore {
     private(set) var pendingEnd = 0
     private(set) var stopping = false
     private(set) var stopAtWrap = false
+    private(set) var endingPending = false
     private(set) var currentLayer = -1
     private(set) var currentLayerActive = false
     private(set) var rhythmRunning = false
@@ -232,6 +236,7 @@ final class LoopCore {
         case .stop: requestStop()
         case .toggleUndo: toggleUndo()
         case .clear: clearAll()
+        case .resetRhythm: rhythm.reset()
         case .setLoaded(let len):
             if state == .empty {
                 loopLength = max(0, min(len, capacity))
@@ -253,8 +258,10 @@ final class LoopCore {
         guard state == .empty else { return }
         if rhythmOn {
             let mf = rhythm.measureFrames
-            if countIn {
+            if countIn || rhythmIntro {
                 rhythm.reset()
+                rhythm.cancelSpecial()
+                if rhythmIntro { rhythm.startIntro() }
                 countdown = Int(mf.rounded())
                 state = .armed
                 return
@@ -293,6 +300,7 @@ final class LoopCore {
         stopAtWrap = false
         updateGains()
         rhythm.reset()
+        rhythm.cancelSpecial()
         loopGeneration &+= 1
     }
 
@@ -406,7 +414,9 @@ final class LoopCore {
         gainTarget = 1
         let secs = startMode == .fadeIn ? max(0.05, fadeSeconds) : 0.004
         gainStep = Float(1.0 / (secs * sampleRate))
+        endingPending = false
         rhythm.reset()
+        rhythm.cancelSpecial()
     }
 
     private func requestStop() {
@@ -417,7 +427,17 @@ final class LoopCore {
             state = .empty
         case .playing, .overdubbing:
             if state == .overdubbing { state = .playing }
-            if stopping || stopAtWrap { enterStopped(); return }   // second stop = stop now
+            if stopping || stopAtWrap || endingPending {             // second stop = stop now
+                rhythm.cancelSpecial()
+                enterStopped()
+                return
+            }
+            if rhythmEnding && rhythmOn {
+                // RC-5 style ending: fill to the next bar line, final hit, then stop
+                endingPending = true
+                rhythm.requestEnding()
+                return
+            }
             switch stopMode {
             case .immediate:
                 stopping = true
@@ -436,6 +456,7 @@ final class LoopCore {
     }
 
     private func enterStopped() {
+        endingPending = false
         state = .stopped
         stopping = false
         stopAtWrap = false
@@ -463,6 +484,8 @@ final class LoopCore {
         state = .empty
         loopLength = 0
         loopTempo = 0
+        endingPending = false
+        rhythm.cancelSpecial()
         playPos = 0
         syncStretch()
         recordPos = 0
@@ -857,6 +880,13 @@ final class LoopCore {
             let rActive = rhythmOn && state != .stopped
             let rs: (Float, Float) = rActive ? rhythm.tick() : rhythm.tail()
             if rActive { rhythmWasRunning = true }
+            if endingPending && rhythm.consumeEndingDone() {
+                // the ending's final hit just played: stop the loop with a short fade
+                endingPending = false
+                stopping = true
+                gainTarget = 0
+                gainStep = Float(1.0 / (0.012 * sampleRate))
+            }
             let rg: Float = (state == .playing || state == .overdubbing) ? gain : 1
 
             var oL = lpL * lvl + rs.0 * rl * rg

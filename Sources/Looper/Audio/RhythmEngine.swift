@@ -91,6 +91,13 @@ final class RhythmEngine {
     private var activeVar = 0
     private var requestedVar = 0
 
+    /// Special phrases (RC-5 style intro / ending).
+    enum Mode { case normal, intro, ending, finished }
+    private(set) var mode: Mode = .normal
+    private var endingArmed = false
+    /// Set when the ending's final hit has been played (read by LoopCore).
+    private(set) var endingDone = false
+
     init(sampleRate: Double) {
         self.sampleRate = sampleRate
         synth = DrumSynth(sampleRate: sampleRate)
@@ -142,9 +149,68 @@ final class RhythmEngine {
         return (Double(s) + sw) * stepFrames
     }
 
+    func startIntro() { mode = .intro }
+
+    func requestEnding() {
+        guard mode == .normal || mode == .intro else { return }
+        mode = .ending
+        endingArmed = false
+        endingDone = false
+    }
+
+    func cancelSpecial() {
+        mode = .normal
+        endingArmed = false
+        endingDone = false
+    }
+
+    func consumeEndingDone() -> Bool {
+        guard endingDone else { return false }
+        endingDone = false
+        return true
+    }
+
+    /// One step of a drum fill inside the last beat of the bar (k = step within the beat).
+    private func playFill(_ k: Int, _ spb: Int) {
+        let pos = Double(k) / Double(spb)
+        let inst = pos < 0.5 ? 1 : (pos < 0.75 ? 6 : 7)
+        let vel = Float(0.72 + 0.28 * pos)
+        synth.trigger(inst, vel)
+        if k == 0 { synth.trigger(0, 0.9) }
+    }
+
     private func fire(_ s: Int) {
-        let idx = s % steps[curPattern]
-        if idx == 0 { activeVar = requestedVar }
+        let n = steps[curPattern]
+        let idx = s % n
+        let spb = max(1, Int((Double(n) / max(0.5, beats[curPattern])).rounded()))
+        let fillStart = n - spb
+        if idx == 0 {
+            if mode == .ending && endingArmed {
+                // final hit on the downbeat, then the rhythm stops
+                synth.trigger(5, 1.0)
+                synth.trigger(0, 1.0)
+                mode = .finished
+                endingDone = true
+                return
+            }
+            activeVar = requestedVar
+        }
+        if mode == .finished { return }
+        if mode == .ending { endingArmed = true }
+        // fills: intro bar, ending bar, and when switching variation A <-> B
+        let wantsFill = mode == .ending || mode == .intro || requestedVar != activeVar
+        if wantsFill && spb >= 2 && idx >= fillStart {
+            playFill(idx - fillStart, spb)
+            return
+        }
+        if mode == .intro {
+            // count: rim click + hi-hat on every beat
+            if idx % spb == 0 {
+                synth.trigger(8, idx == 0 ? 1.0 : 0.7)
+                synth.trigger(2, 0.6)
+            }
+            return
+        }
         let base = (curPattern * 2 + activeVar) * kInstrumentCount * kMaxSteps
         for d in 0..<kInstrumentCount {
             let v = table[base + d * kMaxSteps + idx]
