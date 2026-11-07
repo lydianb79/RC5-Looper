@@ -106,6 +106,8 @@ final class MIDIManager {
     private func resetClock() {
         tickCount = 0
         tickWrite = 0
+        smoothedTempo = 0
+        ticksSinceReport = 0
     }
 
     /// Measures the tempo over the last 24 clock ticks (one quarter note).
