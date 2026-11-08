@@ -54,7 +54,7 @@ Running the workflow again for the same version replaces that release's files.
 ## First steps
 
 1. **Audio** tab (also the AUDIO key on the panel, or ⌘,): choose the input and output device (built-in, a USB/Thunderbolt audio interface, or an aggregate device), the input channels, the output pair and the buffer size.
-2. Set **Latency compensation** on the Setup tab so overdubs line up with what you hear.
+2. Set **Latency compensation** (also on the Audio tab) so overdubs line up with what you hear.
 3. Press **Space** (or click the big pedal) to record, press again to close the loop, and keep pressing to overdub.
 4. Turn on **Rhythm** and pick a pattern and kit on the Rhythm tab. Use **WRITE** (⌘S) to save the loop to one of the 99 memories.
 
@@ -122,7 +122,7 @@ Realtime design: the audio thread never allocates or blocks. UI commands go thro
 ## Tips & known limits
 - **Themes:** Midnight (default), Crimson (RC-5 red) and Arctic — palette icon in the header or Setup › Appearance.
 - **External MIDI clock** only follows the tempo. MIDI Start restarts from the top, but the beat isn't locked tick by tick, so very long sessions may drift slightly.
-- **Latency compensation** (Setup tab) shifts overdubs so they line up with what you heard. Start from the estimate, then fine-tune by ear.
+- **Latency compensation** (Audio tab) shifts overdubs so they line up with what you heard. Start from the estimate, then fine-tune by ear.
 - Use headphones, or plug a guitar into an audio interface: the built-in mic plus speakers will feed back into the loop.
 - The buffer size is a device setting, so it also affects other apps using the same interface.
 - Different input and output devices run on separate clocks. If they won't start together or drift, combine them into an Aggregate Device in Audio MIDI Setup.
