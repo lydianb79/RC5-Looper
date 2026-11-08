@@ -62,7 +62,7 @@ Running the workflow again for the same version replaces that release's files.
 
 | RC-5 | Looper |
 |---|---|
-| 1 stereo track, 32-bit float | Stereo 32-bit float engine at the device sample rate. Max loop length is set in Setup (default 10 min; memory is only used for what you record). |
+| 1 stereo track, 32-bit float | Stereo 32-bit float engine at the device sample rate. Max loop length is set on the Audio tab (default 10 min; memory is only used for what you record). |
 | Pedal: REC → DUB → PLAY | Big pedal / **Space**. Rec action can be REC→DUB→PLAY or REC→PLAY→DUB. |
 | Double press = STOP | Double-press the pedal (or **Esc**, the STOP footswitch). |
 | Hold pedal = UNDO/REDO, hold when stopped = CLEAR | Same (2 s hold). UNDO/REDO and CLEAR footswitches too. |
