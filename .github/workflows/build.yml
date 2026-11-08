@@ -1,0 +1,43 @@
+name: Build macOS apps
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: macos-14          # Apple silicon runner; x86_64 is cross-compiled
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Build arm64 and x86_64
+        run: |
+          set -euo pipefail
+          VERSION=$(grep -o 'static let version = "[^"]*"' Sources/Looper/Model/LooperController.swift | cut -d'"' -f2)
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          mkdir -p dist
+          for ARCH in arm64 x86_64; do
+            swift build -c release --arch "$ARCH"
+            BIN="$(swift build -c release --arch "$ARCH" --show-bin-path)/Looper"
+            lipo -info "$BIN"
+            APP="dist/$ARCH/Looper ($ARCH).app"
+            mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/Drums"
+            cp "$BIN" "$APP/Contents/MacOS/Looper"
+            cp Resources/Info.plist "$APP/Contents/Info.plist"
+            cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+            cp Resources/Drums/*.wav "$APP/Contents/Resources/Drums/"
+            codesign --force --sign - "$APP"
+            (cd "dist/$ARCH" && zip -qry "../Looper-$VERSION-$ARCH.zip" "Looper ($ARCH).app")
+          done
+          ls -la dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Looper-${{ env.VERSION }}-macOS
+          path: dist/*.zip
