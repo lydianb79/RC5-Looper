@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14          # Apple silicon runner; x86_64 is cross-compiled
+    runs-on: macos-latest      # Apple silicon runner; x86_64 is cross-compiled
     steps:
       - uses: actions/checkout@v4
 
