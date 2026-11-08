@@ -2,18 +2,61 @@
 
 A native SwiftUI + AVAudioEngine app for macOS 13+ (Apple silicon and Intel). It works like the RC-5: one stereo track, one pedal, rhythm guide, 99 phrase memories.
 
-## Build & run
+![Looper icon](Resources/Icon/AppIcon-1024.png)
+
+**Current version: 1.8**. Highlights:
+- **Looping:** overdub/replace with undo, and a live loop tempo (keep pitch or varispeed).
+- **Rhythm:** 57 patterns played on real recorded drums, with intro, ending and fills.
+- **Audio and MIDI:** audio interface support (device, channel and buffer selection), MIDI control, and MIDI clock in and out.
+
+## Download
+
+Ready-made builds are on the [Releases page](https://github.com/lydianb79/RC5-Looper/releases/latest):
+
+| File | For |
+|---|---|
+| `Looper-<version>-arm64.zip` → **Looper (arm64).app** | Apple silicon Macs (M1, M2, M3, M4) |
+| `Looper-<version>-x86_64.zip` → **Looper (x86_64).app** | Intel Macs (also runs on Apple silicon under Rosetta) |
+
+The apps are ad-hoc signed, not notarized. On first launch, right-click the app, choose **Open** and confirm. macOS then asks for microphone access.
+
+## Build from source
 
 Requirements: macOS 13 Ventura or later, plus Xcode 15+ (or the Xcode Command Line Tools with Swift 5.9+).
 
 ```bash
-cd Looper
-./build_app.sh release --open      # builds build/Looper.app and launches it
+git clone https://github.com/lydianb79/RC5-Looper.git
+cd RC5-Looper
+./build_app.sh release --open      # builds build/Looper.app for this Mac and launches it
 ```
 
-Copy `build/Looper.app` to /Applications if you like. On first launch, macOS asks for microphone access. Pick the input and output device (built-in, a USB/Thunderbolt audio interface, or an aggregate device), the input channels and the buffer size on the **Audio** tab (also the AUDIO button on the panel, or ⌘,).
+To update later, run `git pull && ./build_app.sh release --open`. Copy `build/Looper.app` to /Applications if you like.
 
 You can also run `open Package.swift` to work in Xcode. For recording, run the bundled app from the build script: a bare executable has no `NSMicrophoneUsageDescription`, so macOS won't grant it microphone access.
+
+### Building for a specific architecture
+
+```bash
+swift build -c release --arch arm64     # Apple silicon
+swift build -c release --arch x86_64    # Intel (cross-compiles fine on Apple silicon)
+```
+
+### Automated builds (GitHub Actions)
+
+`.github/workflows/build.yml` builds both architectures on a macOS runner. It packages them as labelled, ad-hoc signed apps, `Looper (arm64).app` and `Looper (x86_64).app`, and publishes them as the GitHub release `v<version>`. The version is taken from `LooperController.version`.
+
+To make a new release:
+1. Raise `static let version` in `Sources/Looper/Model/LooperController.swift` and push.
+2. On GitHub, go to **Actions › Build macOS apps › Run workflow**.
+
+Running the workflow again for the same version replaces that release's files.
+
+## First steps
+
+1. **Audio** tab (also the AUDIO key on the panel, or ⌘,): choose the input and output device (built-in, a USB/Thunderbolt audio interface, or an aggregate device), the input channels, the output pair and the buffer size.
+2. Set **Latency compensation** on the Setup tab so overdubs line up with what you hear.
+3. Press **Space** (or click the big pedal) to record, press again to close the loop, and keep pressing to overdub.
+4. Turn on **Rhythm** and pick a pattern and kit on the Rhythm tab. Use **WRITE** (⌘S) to save the loop to one of the 99 memories.
 
 ## RC-5 feature mapping
 
@@ -65,18 +108,28 @@ Sources/Looper
 │   ├── LooperController.swift   pedal logic (tap / double / hold), memories, MIDI, keyboard, UI snapshot
 │   ├── MemoryStore.swift        99 memories, WAV read/write
 │   └── Settings.swift           enums, per-memory settings
-├── MIDI/MIDIManager.swift       CoreMIDI in/out + clock
-└── Views/                       pedal panel, LCD, Setup / Rhythm / Memory / Help panels
+├── MIDI/MIDIManager.swift       CoreMIDI in/out, clock out, clock-in tempo detection
+└── Views/                       pedal panel, display, Audio / Setup / Rhythm / Memory / Help panels
+
+Resources/                       Info.plist, AppIcon.icns, Icon/ (artwork), Drums/ (CC0 recordings)
+Tools/                           make_icon.py, drums/build_drums.py
+.github/workflows/build.yml      CI: arm64 + x86_64 builds → GitHub release
+build_app.sh                     local build → build/Looper.app
 ```
 
 Realtime design: the audio thread never allocates or blocks. UI commands go through a small queue that the audio thread reads with `os_unfair_lock_trylock`. The loop is stored as `base + layerA + layerB`. Each overdub writes to its own layer, so undo/redo just mutes or unmutes it. When the next overdub starts, the previous layer is merged into the base a chunk at a time. Merging waits 2.5 s, so a double-press or a hold can still cancel the overdub that was just started.
 
 ## Tips & known limits
 - **Themes:** Midnight (default), Crimson (RC-5 red) and Arctic — palette icon in the header or Setup › Appearance.
-- **Latency compensation** (Setup › Audio) shifts overdubs so they line up with what you heard. Start from the estimate, then fine-tune by ear.
+- **External MIDI clock** only follows the tempo. MIDI Start restarts from the top, but the beat isn't locked tick by tick, so very long sessions may drift slightly.
+- **Latency compensation** (Setup tab) shifts overdubs so they line up with what you heard. Start from the estimate, then fine-tune by ear.
 - Use headphones, or plug a guitar into an audio interface: the built-in mic plus speakers will feed back into the loop.
 - The buffer size is a device setting, so it also affects other apps using the same interface.
 - Different input and output devices run on separate clocks. If they won't start together or drift, combine them into an Aggregate Device in Audio MIDI Setup.
 - On interfaces with more than two outputs, choose the output pair on the Audio tab. The other outputs are muted while Looper is running.
 - The memory always stores the loop at its recorded tempo, together with the current tempo. Export WAV writes the loop at its original speed.
 - Keep pitch stretching is a simple granular method. Very large tempo changes can sound slightly phasey; Varispeed sounds clean but shifts the pitch.
+
+## Credits & license
+- **Drum recordings:** *Big Rusty Drums* by Karoryfer Samples (CC0). See `Resources/Drums/LICENSE-SAMPLES.md`.
+- BOSS and RC-5 are trademarks of Roland Corporation. This project is an independent app inspired by the RC-5 and is not affiliated with or endorsed by Roland.
