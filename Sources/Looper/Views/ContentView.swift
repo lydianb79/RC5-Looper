@@ -210,15 +210,44 @@ struct AudioSetupView: View {
                         }
                     }
                 }
-                Toggle("Mono input (one input channel on both sides)", isOn: $looper.monoInput)
-                if looper.inputChannelCount > 1 {
-                    Picker(looper.monoInput ? "Input channel" : "Left input channel", selection: $looper.inputLeftChannel) {
+                Picker("Input", selection: Binding(get: { looper.stereoInput }, set: { looper.stereoInput = $0 })) {
+                    Text("Mono").tag(false)
+                    Text("Stereo").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .disabled(looper.inputChannelCount < 2 && looper.monoInput)
+                if looper.inputChannelCount < 2 {
+                    Text("This input device has only one channel, so it records in mono.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else if looper.monoInput {
+                    Picker("Input channel", selection: $looper.inputLeftChannel) {
                         ForEach(0..<looper.inputChannelCount, id: \.self) { Text("Input \($0 + 1)").tag($0) }
                     }
-                    if !looper.monoInput {
-                        Picker("Right input channel", selection: $looper.inputRightChannel) {
+                    Text("The selected channel is recorded on both sides (centre).")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Picker("Input channels", selection: Binding(get: { looper.inputPair }, set: { looper.inputPair = $0 })) {
+                        ForEach(Array(stride(from: 0, to: looper.inputChannelCount - 1, by: 2)), id: \.self) { i in
+                            Text("Inputs \(i + 1) + \(i + 2)").tag(i)
+                        }
+                        if looper.inputPair < 0 {
+                            Text("Custom (\(looper.inputLeftChannel + 1) + \(looper.inputRightChannel + 1))").tag(-1)
+                        }
+                    }
+                    DisclosureGroup("Custom left / right channels") {
+                        Picker("Left", selection: $looper.inputLeftChannel) {
                             ForEach(0..<looper.inputChannelCount, id: \.self) { Text("Input \($0 + 1)").tag($0) }
                         }
+                        Picker("Right", selection: $looper.inputRightChannel) {
+                            ForEach(0..<looper.inputChannelCount, id: \.self) { Text("Input \($0 + 1)").tag($0) }
+                        }
+                    }
+                    LabeledContent("Input levels") {
+                        VStack(spacing: 4) {
+                            HStack { Text("L").font(.caption2); LevelMeter(level: looper.snapshot.inLevelL) }
+                            HStack { Text("R").font(.caption2); LevelMeter(level: looper.snapshot.inLevelR) }
+                        }
+                        .frame(width: 180)
                     }
                 }
                 Picker("Buffer size", selection: $looper.bufferFrames) {

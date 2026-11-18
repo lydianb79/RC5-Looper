@@ -151,6 +151,8 @@ struct Snapshot: Equatable {
     var canUndo = false
     var canRedo = false
     var inLevel: Float = 0
+    var inLevelL: Float = 0
+    var inLevelR: Float = 0
     var outLevel: Float = 0
     var waitingQuantize = false
     var stopping = false

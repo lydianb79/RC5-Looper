@@ -89,6 +89,8 @@ final class LoopCore {
     private(set) var rhythmRunning = false
     private(set) var recordedWithRhythm = false
     private(set) var inLevel: Float = 0
+    private(set) var inLevelL: Float = 0
+    private(set) var inLevelR: Float = 0
     private(set) var outLevel: Float = 0
     private(set) var loopGeneration = 0
     var rhythmFrame: Int { rhythm.frame }
@@ -813,6 +815,8 @@ final class LoopCore {
         let rl = rhythmLevel
         let mon = inputMonitor
         var inPk: Float = 0
+        var inPkL: Float = 0
+        var inPkR: Float = 0
         var outPk: Float = 0
         var rhythmWasRunning = false
 
@@ -824,7 +828,11 @@ final class LoopCore {
                 inR = ringR[ringRead & ringMask]
                 ringRead += 1
             }
-            let ia = max(abs(inL), abs(inR))
+            let aL = abs(inL)
+            let aR = abs(inR)
+            if aL > inPkL { inPkL = aL }
+            if aR > inPkR { inPkR = aR }
+            let ia = max(aL, aR)
             if ia > inPk { inPk = ia }
 
             // Waiting states
@@ -904,6 +912,8 @@ final class LoopCore {
         }
         rhythmRunning = rhythmWasRunning
         inLevel = max(inPk, inLevel * 0.85)
+        inLevelL = max(inPkL, inLevelL * 0.85)
+        inLevelR = max(inPkR, inLevelR * 0.85)
         outLevel = max(outPk, outLevel * 0.85)
     }
 

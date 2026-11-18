@@ -93,7 +93,12 @@ struct PedalView: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .help("Theme")
-            SegmentMeter(level: snap.inLevel, label: "IN", ink: theme.ink)
+            if looper.monoInput || looper.inputChannelCount < 2 {
+                SegmentMeter(level: snap.inLevel, label: "IN", ink: theme.ink)
+            } else {
+                SegmentMeter(level: snap.inLevelL, label: "IN L", ink: theme.ink)
+                SegmentMeter(level: snap.inLevelR, label: "IN R", ink: theme.ink)
+            }
             SegmentMeter(level: snap.outLevel, label: "OUT", ink: theme.ink)
         }
     }

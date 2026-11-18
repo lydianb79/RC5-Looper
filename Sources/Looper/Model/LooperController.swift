@@ -19,7 +19,7 @@ enum SideTab: String, CaseIterable, Identifiable {
 
 /// Main-thread brain of the app: pedal logic, memories, settings, MIDI, UI snapshot.
 final class LooperController: ObservableObject {
-    static let version = "1.8"
+    static let version = "1.9"
 
     // MARK: Published UI state
     @Published var settings = MemorySettings.defaults(for: 0) { didSet { applySettings() } }
@@ -40,7 +40,7 @@ final class LooperController: ObservableObject {
     // Global preferences (not per memory)
     @Published var latencyMs: Double { didSet { defaults.set(latencyMs, forKey: "latencyMs"); applyGlobals() } }
     @Published var inputMonitor: Bool { didSet { defaults.set(inputMonitor, forKey: "inputMonitor"); applyGlobals() } }
-    @Published var monoInput: Bool { didSet { defaults.set(monoInput, forKey: "monoInput"); applyGlobals() } }
+    @Published var monoInput: Bool { didSet { defaults.set(monoInput, forKey: "monoInput"); applyGlobals(); updateDeviceSummary() } }
     @Published var autoRecThreshold: Double { didSet { defaults.set(autoRecThreshold, forKey: "autoRecThreshold"); applyGlobals() } }
     @Published var midiClockOut: Bool { didSet { defaults.set(midiClockOut, forKey: "midiClockOut") } }
     @Published var syncExternal: Bool { didSet { defaults.set(syncExternal, forKey: "syncExternal") } }
@@ -59,8 +59,47 @@ final class LooperController: ObservableObject {
     @Published var bufferFrames: Int { didSet { if bufferFrames != oldValue { defaults.set(bufferFrames, forKey: "bufferFrames"); restartAudio() } } }
     @Published private(set) var outputChannelCount = 0
     @Published var outputPair: Int { didSet { if outputPair != oldValue { defaults.set(outputPair, forKey: "outputPair"); restartAudio() } } }
-    @Published var inputLeftChannel: Int { didSet { defaults.set(inputLeftChannel, forKey: "inputLeftChannel"); applyGlobals() } }
-    @Published var inputRightChannel: Int { didSet { defaults.set(inputRightChannel, forKey: "inputRightChannel"); applyGlobals() } }
+    @Published var inputLeftChannel: Int { didSet { defaults.set(inputLeftChannel, forKey: "inputLeftChannel"); applyGlobals(); updateDeviceSummary() } }
+    @Published var inputRightChannel: Int { didSet { defaults.set(inputRightChannel, forKey: "inputRightChannel"); applyGlobals(); updateDeviceSummary() } }
+
+    /// Stereo recording from two input channels (e.g. inputs 1 + 2) instead of one mono channel.
+    var stereoInput: Bool {
+        get { !monoInput }
+        set {
+            monoInput = !newValue
+            if newValue && inputChannelCount > 1 {
+                // default to a pair that starts on the current channel (1 + 2, 3 + 4, …)
+                if inputRightChannel == inputLeftChannel || inputRightChannel >= inputChannelCount {
+                    let left = min(inputLeftChannel, inputChannelCount - 2)
+                    inputLeftChannel = left
+                    inputRightChannel = left + 1
+                }
+            }
+        }
+    }
+
+    /// Stereo pair by its first channel (0 = inputs 1 + 2, 2 = inputs 3 + 4, …).
+    /// -1 = a custom (non-adjacent) left/right combination.
+    var inputPair: Int {
+        get { inputLeftChannel % 2 == 0 && inputRightChannel == inputLeftChannel + 1 ? inputLeftChannel : -1 }
+        set {
+            guard newValue >= 0 else { return }
+            inputLeftChannel = newValue
+            inputRightChannel = min(newValue + 1, max(0, inputChannelCount - 1))
+        }
+    }
+
+    var inputRoutingText: String {
+        if monoInput || inputChannelCount < 2 { return "Mono \(min(inputLeftChannel, max(0, inputChannelCount - 1)) + 1)" }
+        return "Stereo \(inputLeftChannel + 1)+\(inputRightChannel + 1)"
+    }
+
+    private var lastDeviceNames = ""
+
+    private func updateDeviceSummary() {
+        guard !lastDeviceNames.isEmpty else { return }
+        deviceSummary = "\(lastDeviceNames) · \(inputRoutingText) in"
+    }
 
     let audio: AudioEngineManager
     var core: LoopCore { audio.core }
@@ -166,7 +205,8 @@ final class LooperController: ObservableObject {
             audioStatus = "In: \(audio.inputDescription)\nOut: \(audio.outputDescription)\nEngine: \(Int(core.sampleRate)) Hz · buffer \(audio.actualBufferFrames) frames"
             if let e = audio.lastError { audioStatus += "\n⚠︎ \(e)" }
             let outs = audio.outputChannelCount > 2 ? " \(audio.activeOutputPair + 1)–\(audio.activeOutputPair + 2)" : ""
-            deviceSummary = "\(AudioDevices.name(audio.activeInputDevice)) → \(AudioDevices.name(audio.activeOutputDevice))\(outs) · \(audio.actualBufferFrames)"
+            lastDeviceNames = "\(AudioDevices.name(audio.activeInputDevice)) → \(AudioDevices.name(audio.activeOutputDevice))\(outs) · \(audio.actualBufferFrames)"
+            deviceSummary = lastDeviceNames
             if latencyMs < 0 { latencyMs = (audio.estimatedLatencyMs * 10).rounded() / 10 }
         } catch {
             audioStatus = "Audio failed to start: \(error.localizedDescription)"
@@ -176,6 +216,7 @@ final class LooperController: ObservableObject {
         }
         inputChannelCount = audio.inputChannelCount
         outputChannelCount = audio.outputChannelCount
+        updateDeviceSummary()
         actualBufferFrames = audio.actualBufferFrames
         applyGlobals()
     }
@@ -424,6 +465,8 @@ final class LooperController: ObservableObject {
         s.canUndo = c.currentLayer >= 0 && c.currentLayerActive
         s.canRedo = c.currentLayer >= 0 && !c.currentLayerActive
         s.inLevel = c.inLevel
+        s.inLevelL = c.inLevelL
+        s.inLevelR = c.inLevelR
         s.outLevel = c.outLevel
         s.waitingQuantize = c.pendingEnd > 0
         s.stopping = c.stopping || c.stopAtWrap || c.endingPending

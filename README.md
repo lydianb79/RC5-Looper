@@ -8,7 +8,7 @@ A native SwiftUI + AVAudioEngine app for macOS 13+ (Apple silicon and Intel). It
 
 *The pedal panel (display, LOOP/RHYTHM knobs, memory and rhythm keys, the big pedal, STOP/UNDO/CLEAR) with the Rhythm tab open.*
 
-**Current version: 1.8**. Highlights:
+**Current version: 1.9**. Highlights:
 - **Looping:** overdub/replace with undo, and a live loop tempo (keep pitch or varispeed).
 - **Rhythm:** 57 patterns played on real recorded drums, with intro, ending and fills.
 - **Audio and MIDI:** audio interface support (device, channel and buffer selection), MIDI control, and MIDI clock in and out.
@@ -70,7 +70,7 @@ Running the workflow again for the same version replaces that release's files.
 
 ## First steps
 
-1. **Audio** tab (also the AUDIO key on the panel, or ⌘,): choose the input and output device (built-in, a USB/Thunderbolt audio interface, or an aggregate device), the input channels, the output pair and the buffer size.
+1. **Audio** tab (also the AUDIO key on the panel, or ⌘,): choose the input and output device (built-in, a USB/Thunderbolt audio interface, or an aggregate device), Mono or Stereo input and its channels, the output pair and the buffer size.
 2. Set **Latency compensation** (also on the Audio tab) so overdubs line up with what you hear.
 3. Press **Space** (or click the big pedal) to record, press again to close the loop, and keep pressing to overdub.
 4. Turn on **Rhythm** and pick a pattern and kit on the Rhythm tab. Use **WRITE** (⌘S) to save the loop to one of the 99 memories.
@@ -89,7 +89,7 @@ Running the workflow again for the same version replaces that release's files.
 | Start: immediate / fade in · Stop: immediate / fade out / loop end | All of them, with adjustable fade time. A second stop press stops right away. |
 | One shot, reverse | Both. |
 | Tempo: tap / derived from loop, change loop tempo | Tap tempo (**T**). Without rhythm, the tempo is worked out from the loop length. After recording, the tempo stays live: changing it (slider, tap, ±) speeds the loop up or down from 50 % to 200 % and the rhythm follows. **Keep pitch** uses a granular time-stretch; **Varispeed** works like tape, so the pitch follows the speed. You can overdub at any tempo. **Original tempo** returns to the recorded speed. |
-| — | Audio device selection (input/output). On multichannel interfaces you can choose the input channels and the output pair (Outputs 1–2, 3–4, …). Buffer size from 32 to 2048 frames. |
+| — | Audio device selection (input/output). **Input: Mono or Stereo**: Mono records one channel in the centre; Stereo records a channel pair (Inputs 1 + 2, 3 + 4, … or custom left/right) with separate L/R meters. On multichannel interfaces you can also choose the output pair (Outputs 1–2, 3–4, …). Buffer size from 32 to 2048 frames. |
 | 57 rhythm patterns × 2 variations, 7 kits, rhythm reverb | 57 patterns (Rock, Pop, Funk, Blues, Jazz, Latin, Reggae, Metal, Electronic, Country, odd meters, metronome), each with variations A and B. The 7 kits are Studio, Live, Light (brushes), Heavy, Rock (rimshots), Metal and Electronic (synthesized 808/909 style). The acoustic kits play **real multi-mic drum recordings**: Karoryfer *Big Rusty Drums*, CC0, bundled in `Resources/Drums`. Each drum has 3 velocity layers × 2 round-robin takes and is tuned and saturated per kit. Playback uses a 32-voice engine, so cymbals ring out, the closed hi-hat chokes the open one, and each kit has its own room reverb. |
 | Rhythm intro / ending, fill-in | **Intro**: a one-bar count with a fill before recording starts. **Ending**: STOP plays a fill and stops loop and rhythm together on the next bar line with a crash and kick. Press STOP again to stop right away. Switching variation A↔B plays a fill in the last beat. |
 | Loop level / rhythm level | LOOP LEVEL knob (0–200) and rhythm level. |
