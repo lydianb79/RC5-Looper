@@ -15,6 +15,10 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/Looper" "$APP/Contents/MacOS/Looper"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+# stamp the app version (About window, Finder) from LooperController.version
+VERSION_STR=$(grep -o 'static let version = "[^"]*"' Sources/Looper/Model/LooperController.swift | cut -d'"' -f2)
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION_STR" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(git rev-list --count HEAD 2>/dev/null || echo 1)" "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 mkdir -p "$APP/Contents/Resources/Drums"
 cp Resources/Drums/*.wav "$APP/Contents/Resources/Drums/"

@@ -451,6 +451,8 @@ struct HelpView: View {
             }
             Section("Version") {
                 LabeledContent("Looper", value: LooperController.version)
+                LabeledContent("Build", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "–")
+                LabeledContent("Architecture", value: LooperController.architecture)
             }
             Section("How it works") {
                 Text("Press the pedal to record. Press again to close the loop: depending on Rec action it goes straight into overdub or into playback. Every overdub sits on its own layer, so the latest one can always be undone and redone. With Rhythm on and Loop quantize enabled, the loop length snaps to whole bars and the tempo is kept; without rhythm, the tempo is derived from the loop length.")

@@ -29,7 +29,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct LooperCommands: Commands {
     let looper: LooperController
 
+    static func showAbout() {
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "–"
+        #if arch(arm64)
+        let arch = "Apple silicon (arm64)"
+        #else
+        let arch = "Intel (x86_64)"
+        #endif
+        let credits = NSAttributedString(
+            string: "A phrase looper inspired by the BOSS RC-5.\n\(arch)\nDrums: Big Rusty Drums by Karoryfer Samples (CC0).",
+            attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor])
+        NSApp.orderFrontStandardAboutPanel(options: [
+            .applicationName: "Looper",
+            .applicationVersion: LooperController.version,
+            .version: "build \(build)",
+            .credits: credits,
+        ])
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     var body: some Commands {
+        CommandGroup(replacing: .appInfo) {
+            Button("About Looper") { LooperCommands.showAbout() }
+        }
+        CommandGroup(replacing: .help) {
+            Button("Looper Help & Shortcuts") { looper.selectedTab = .help }
+                .keyboardShortcut("?", modifiers: .command)
+            Divider()
+            Button("Release Notes (v\(LooperController.version))") {
+                if let url = URL(string: "https://github.com/lydianb79/RC5-Looper/releases/tag/v\(LooperController.version)") { NSWorkspace.shared.open(url) }
+            }
+            Button("Looper on GitHub") {
+                if let url = URL(string: "https://github.com/lydianb79/RC5-Looper") { NSWorkspace.shared.open(url) }
+            }
+        }
         CommandGroup(replacing: .appSettings) {
             Button("Audio Devices…") { looper.selectedTab = .audio }
                 .keyboardShortcut(",", modifiers: .command)

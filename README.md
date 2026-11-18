@@ -17,7 +17,7 @@ A native SwiftUI + AVAudioEngine app for macOS 13+ (Apple silicon and Intel). It
 
 | Version | Changes |
 |---|---|
-| **1.9** | **Stereo input:** the Audio tab now has an Input setting, Mono or Stereo. Stereo records a channel pair (Inputs 1 + 2 by default, 3 + 4, … or custom left/right), with separate L/R input meters. |
+| **1.9** | **Stereo input:** the Audio tab now has an Input setting, Mono or Stereo. Stereo records a channel pair (Inputs 1 + 2 by default, 3 + 4, … or custom left/right), with separate L/R input meters. **About Looper** now shows the real version, build number and architecture; the build scripts and CI write the version into Info.plist. New **Help** menu: Help & Shortcuts (⌘?), Release Notes, GitHub. |
 | 1.8 | Rhythm **intro** (count + fill) and **ending** (fill + final hit), a fill when switching variation A↔B, and **external MIDI clock** sync (tempo, Start/Stop/Continue). Labelled arm64 / x86_64 release builds (CI and `release.sh`). |
 | 1.7 | Output pair selection for multichannel interfaces. |
 | 1.6 | **Real recorded drums** (Karoryfer *Big Rusty Drums*, CC0) with velocity layers and round-robin takes. |
