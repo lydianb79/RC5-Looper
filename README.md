@@ -1,8 +1,12 @@
+<img src="Resources/Icon/AppIcon-1024.png" alt="Looper icon" width="128" align="right">
+
 # Looper — a native macOS phrase looper modeled on the BOSS RC-5
 
 A native SwiftUI + AVAudioEngine app for macOS 13+ (Apple silicon and Intel). It works like the RC-5: one stereo track, one pedal, rhythm guide, 99 phrase memories.
 
-![Looper icon](Resources/Icon/AppIcon-1024.png)
+![Looper main window: the pedal panel on the left, the Rhythm tab on the right](docs/screenshot.png)
+
+*The pedal panel (display, LOOP/RHYTHM knobs, memory and rhythm keys, the big pedal, STOP/UNDO/CLEAR) with the Rhythm tab open.*
 
 **Current version: 1.8**. Highlights:
 - **Looping:** overdub/replace with undo, and a live loop tempo (keep pitch or varispeed).
@@ -113,6 +117,7 @@ Sources/Looper
 
 Resources/                       Info.plist, AppIcon.icns, Icon/ (artwork), Drums/ (CC0 recordings)
 Tools/                           make_icon.py, drums/build_drums.py
+docs/                            screenshot.png (README image)
 .github/workflows/build.yml      CI: arm64 + x86_64 builds → GitHub release
 build_app.sh                     local build → build/Looper.app
 ```
