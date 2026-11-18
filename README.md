@@ -45,6 +45,19 @@ swift build -c release --arch arm64     # Apple silicon
 swift build -c release --arch x86_64    # Intel (cross-compiles fine on Apple silicon)
 ```
 
+### Build and release from your Mac
+
+`release.sh` builds both architectures and publishes them as the GitHub release `v<version>`, with the same file names as the CI. It needs the GitHub CLI: `brew install gh`, then `gh auth login`.
+
+```bash
+./release.sh               # build arm64 + x86_64, zip, create or update release v<version>
+./release.sh --build-only  # only build build/Looper-<version>-{arm64,x86_64}.zip, upload nothing
+./release.sh --draft       # create a new release as a draft
+./release.sh --yes         # skip the confirmation prompt
+```
+
+The version comes from `LooperController.version`. The script stops if you have uncommitted or unpushed changes, so a release always matches a commit on GitHub. If the release already exists, its files are replaced. A brand-new release also creates the tag `v<version>`, which starts the GitHub Actions build too; it re-uploads equivalent files to the same release.
+
 ### Automated builds (GitHub Actions)
 
 `.github/workflows/build.yml` builds both architectures on a macOS runner. It packages them as labelled, ad-hoc signed apps, `Looper (arm64).app` and `Looper (x86_64).app`, and publishes them as the GitHub release `v<version>`. The version is taken from `LooperController.version`.
@@ -120,6 +133,7 @@ Tools/                           make_icon.py, drums/build_drums.py
 docs/                            screenshot.png (README image)
 .github/workflows/build.yml      CI: arm64 + x86_64 builds → GitHub release
 build_app.sh                     local build → build/Looper.app
+release.sh                       local arm64 + x86_64 build → GitHub release v<version>
 ```
 
 Realtime design: the audio thread never allocates or blocks. UI commands go through a small queue that the audio thread reads with `os_unfair_lock_trylock`. The loop is stored as `base + layerA + layerB`. Each overdub writes to its own layer, so undo/redo just mutes or unmutes it. When the next overdub starts, the previous layer is merged into the base a chunk at a time. Merging waits 2.5 s, so a double-press or a hold can still cancel the overdub that was just started.
