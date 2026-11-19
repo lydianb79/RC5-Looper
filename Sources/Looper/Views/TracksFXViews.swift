@@ -4,25 +4,26 @@ import SwiftUI
 
 struct TrackLanesView: View {
     @EnvironmentObject var looper: LooperController
+    var laneHeight: CGFloat = 48
 
     var body: some View {
         let snap = looper.snapshot
         VStack(spacing: 6) {
-            MainLane(snap: snap)
+            MainLane(snap: snap, height: laneHeight)
             ForEach(0..<LoopCore.subCount, id: \.self) { t in
-                SubLane(index: t, snap: snap.tracks[t], main: snap)
+                SubLane(index: t, snap: snap.tracks[t], main: snap, height: laneHeight)
             }
         }
         .frame(maxWidth: .infinity)
     }
 }
 
-private let laneHeight: CGFloat = 48
 private let laneHeaderWidth: CGFloat = 168
 
 private struct MainLane: View {
     @EnvironmentObject var looper: LooperController
     let snap: Snapshot
+    let height: CGFloat
 
     var body: some View {
         let c = UI.state(snap.state)
@@ -53,7 +54,7 @@ private struct MainLane: View {
             LevelSlider(value: Binding(get: { looper.settings.loopLevel }, set: { looper.settings.loopLevel = $0 }))
         }
         .padding(.horizontal, 10)
-        .frame(height: laneHeight)
+        .frame(height: height)
         .background(RoundedRectangle(cornerRadius: 12).fill(UI.panel))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(active ? c : UI.line, lineWidth: active ? 1.5 : 1))
     }
@@ -74,6 +75,7 @@ private struct SubLane: View {
     let index: Int
     let snap: TrackSnapshot
     let main: Snapshot
+    let height: CGFloat
 
     private var color: Color { trackColors[index % trackColors.count] }
 
@@ -126,7 +128,7 @@ private struct SubLane: View {
                                        set: { looper.setTrackLevel(index, $0) }))
         }
         .padding(.horizontal, 10)
-        .frame(height: laneHeight)
+        .frame(height: height)
         .background(RoundedRectangle(cornerRadius: 12).fill(UI.panel))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(st == 1 || st == 3 ? stateColor : UI.line, lineWidth: st == 1 || st == 3 ? 1.5 : 1))
     }

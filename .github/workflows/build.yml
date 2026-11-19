@@ -29,6 +29,7 @@ jobs:
       - name: Compile check
         if: ${{ inputs.check_only }}
         run: |
+          set -o pipefail
           swift build -c release --arch arm64 2>&1 | tee build.log
           grep -E "warning:" build.log | sort -u || true
 
