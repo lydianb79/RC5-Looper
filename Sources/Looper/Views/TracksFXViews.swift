@@ -103,7 +103,7 @@ private struct SubLane: View {
             .frame(width: laneHeaderWidth, alignment: .leading)
             ZStack(alignment: .leading) {
                 Canvas { ctx, size in
-                    drawBars(ctx, size, looper.trackWaves[index], color, pos, dimmed: false)
+                    if !looper.trackWaves[index].isEmpty { drawBars(ctx, size, looper.trackWaves[index], color, pos, dimmed: false) }
                     if st == 2 || st == 3 {
                         let x = size.width * CGFloat(pos)
                         ctx.fill(Path(CGRect(x: x - 1, y: 0, width: 2, height: size.height)), with: .color(.white.opacity(0.9)))

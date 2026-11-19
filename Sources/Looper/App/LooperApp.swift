@@ -39,10 +39,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
-        // SwiftUI rebuilds the menu bar now and then; put the Theme submenu back whenever it is missing.
-        NotificationCenter.default.addObserver(forName: NSApplication.didUpdateNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.ensureThemeMenu()
+        // SwiftUI builds the menu bar after launch and rebuilds it now and then; put the Theme
+        // submenu back whenever it is missing (cheap check, also while the app is in the background).
+        let nc = NotificationCenter.default
+        for name in [NSApplication.didUpdateNotification, NSApplication.didBecomeActiveNotification,
+                     NSMenu.didBeginTrackingNotification, NSMenu.didAddItemNotification, NSMenu.didRemoveItemNotification] {
+            nc.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                DispatchQueue.main.async { self?.ensureThemeMenu() }
+            }
         }
+        menuTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in self?.ensureThemeMenu() }
         ensureThemeMenu()
     }
 
@@ -51,6 +57,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Set by the controller: applies a theme picked in the menu.
     static var onSelectTheme: ((AppTheme) -> Void)?
     private var themeItem: NSMenuItem?
+    private var menuTimer: Timer?
+    private var inserting = false
 
     private func makeThemeItem() -> NSMenuItem {
         let item = NSMenuItem(title: "Theme", action: nil, keyEquivalent: "")
@@ -68,8 +76,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func ensureThemeMenu() {
-        guard let view = NSApp.mainMenu?.items.first(where: { $0.title == "View" })?.submenu else { return }
+        guard !inserting,
+              let view = NSApp.mainMenu?.items.first(where: { $0.title == "View" || $0.submenu?.title == "View" })?.submenu
+        else { return }
         if let item = themeItem, item.menu === view { return }
+        inserting = true
+        defer { inserting = false }
         let item = themeItem ?? makeThemeItem()
         item.menu?.removeItem(item)
         themeItem = item
