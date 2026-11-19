@@ -597,8 +597,6 @@ final class LoopCore {
             case .loopEnd:
                 stopAtWrap = true
             }
-        default:
-            break
         }
     }
 

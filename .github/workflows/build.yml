@@ -29,7 +29,8 @@ jobs:
       - name: Compile check
         if: ${{ inputs.check_only }}
         run: |
-          swift build
+          swift build -c release --arch arm64 2>&1 | tee build.log
+          grep -E "warning:" build.log | sort -u || true
 
       - name: Build arm64 and x86_64
         if: ${{ !inputs.check_only }}

@@ -4,7 +4,10 @@ import SwiftUI
 @main
 struct LooperApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @StateObject private var looper = LooperController()
+    /// Not a @StateObject on purpose: the App body (and with it the whole menu bar) would then be
+    /// rebuilt every time the controller publishes its transport snapshot, many times a second,
+    /// which closes open submenus such as View › Theme. The views observe it via environmentObject.
+    private let looper = LooperController.shared
 
     var body: some Scene {
         WindowGroup("Looper") {
