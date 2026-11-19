@@ -264,7 +264,8 @@ struct RhythmView: View {
                     Slider(value: Binding(get: { looper.settings.tempo }, set: { looper.setTempo($0) }), in: looper.tempoRange)
                         .frame(width: 160)
                         .disabled(looper.tempoLocked)
-                    Text(String(format: "%.1f", looper.settings.tempo)).monospacedDigit().frame(width: 44, alignment: .trailing)
+                    TempoField()
+                    Text("BPM").foregroundStyle(.secondary)
                     Button("Tap") { looper.tapTempo() }
                 }
                 HStack(spacing: 8) {

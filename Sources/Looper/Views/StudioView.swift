@@ -116,6 +116,7 @@ struct StudioView: View {
             }
             StudioFooter()
         }
+        .id(looper.appTheme)       // UI colours are static: rebuild the view tree so every panel picks up the new theme
         .background(ThemeBackground(theme: looper.appTheme, stateColor: UI.state(snap.state),
                                     live: snap.state == .playing || snap.state == .overdubbing || snap.state == .recording))
         .ignoresSafeArea(.container, edges: .top)
@@ -286,6 +287,44 @@ private struct LCDView: View {
     }
 }
 
+/// Type a tempo (BPM) and press Return. Accepts "92", "92.5" or "92,5".
+struct TempoField: View {
+    @EnvironmentObject var looper: LooperController
+    var autofocus = false
+    @State private var text = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        TextField("BPM", text: $text)
+            .textFieldStyle(.roundedBorder)
+            .multilineTextAlignment(.trailing)
+            .monospacedDigit()
+            .frame(width: 64)
+            .focused($focused)
+            .disabled(looper.tempoLocked)
+            .help("Type a tempo and press Return")
+            .onSubmit(apply)
+            .onAppear {
+                text = Self.format(looper.settings.tempo)
+                if autofocus { DispatchQueue.main.async { focused = true } }
+            }
+            .onChange(of: looper.settings.tempo) { t in if !focused { text = Self.format(t) } }
+            .onChange(of: focused) { f in if !f { apply() } }
+    }
+
+    private func apply() {
+        let cleaned = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
+        if let v = Double(cleaned), v > 0, abs(v - looper.settings.tempo) > 0.04 {
+            looper.setTempo(v)
+        }
+        text = Self.format(looper.settings.tempo)
+    }
+
+    static func format(_ t: Double) -> String {
+        t.rounded() == t ? String(Int(t)) : String(format: "%.1f", t)
+    }
+}
+
 private struct TempoPopover: View {
     @EnvironmentObject var looper: LooperController
 
@@ -295,7 +334,7 @@ private struct TempoPopover: View {
             HStack {
                 Slider(value: Binding(get: { looper.settings.tempo }, set: { looper.setTempo($0) }), in: looper.tempoRange)
                     .disabled(looper.tempoLocked)
-                Text(String(format: "%.1f", looper.settings.tempo)).monospacedDigit().frame(width: 48)
+                TempoField(autofocus: true)
                 Stepper("", onIncrement: { looper.setTempo(looper.settings.tempo + 1) },
                         onDecrement: { looper.setTempo(looper.settings.tempo - 1) })
                     .labelsHidden()
@@ -923,18 +962,26 @@ private struct RhythmPanel: View {
                 if looper.snapshot.state == .empty && s.rhythmOn {
                     Button { looper.playStop() } label: {
                         Label(looper.snapshot.rhythmRunning ? "Stop" : "Play", systemImage: looper.snapshot.rhythmRunning ? "stop.fill" : "play.fill")
+                            .frame(minWidth: 54)
                     }
                     .buttonStyle(PillButtonStyle())
+                    .fixedSize()
+                    .layoutPriority(2)
                     .help("Play or stop the rhythm on its own (Space)")
                 }
-                ForEach(RhythmLibrary.categories, id: \.self) { cat in
-                    let selected = pattern.category == cat
-                    Button(cat) {
-                        if let i = RhythmLibrary.patterns.firstIndex(where: { $0.category == cat }) { looper.selectPattern(i) }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(RhythmLibrary.categories, id: \.self) { cat in
+                            let selected = pattern.category == cat
+                            Button(cat) {
+                                if let i = RhythmLibrary.patterns.firstIndex(where: { $0.category == cat }) { looper.selectPattern(i) }
+                            }
+                            .buttonStyle(ChipButtonStyle(selected: selected))
+                            .fixedSize()
+                        }
                     }
-                    .buttonStyle(ChipButtonStyle(selected: selected))
+                    .padding(.vertical, 2)
                 }
-                Spacer(minLength: 8)
             }
             HStack(spacing: 10) {
                 Menu {
@@ -970,6 +1017,8 @@ private struct RhythmPanel: View {
                 ToggleChip(title: "Intro", isOn: $looper.settings.rhythmIntro)
                 ToggleChip(title: "Ending", isOn: $looper.settings.rhythmEnding)
                 ToggleChip(title: "Count-in", isOn: $looper.settings.countIn)
+            }
+            HStack(spacing: 18) {
                 HStack(spacing: 6) {
                     Text("Feel").font(.system(size: 11)).foregroundColor(UI.muted)
                     Slider(value: $looper.settings.rhythmHumanize, in: 0...1).frame(width: 80)
@@ -983,6 +1032,7 @@ private struct RhythmPanel: View {
                     Text("Level").font(.system(size: 11)).foregroundColor(UI.muted)
                     Slider(value: $looper.settings.rhythmLevel, in: 0...2).frame(width: 90)
                 }
+                Spacer(minLength: 0)
             }
             StepGrid(pattern: s.rhythmPattern, variation: s.rhythmVariation, on: s.rhythmOn,
                      step: looper.snapshot.rhythmStep, names: Self.drumNames, core: looper.core)
