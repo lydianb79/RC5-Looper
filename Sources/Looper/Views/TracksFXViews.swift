@@ -1,127 +1,74 @@
 import SwiftUI
 
-// MARK: - Loop tools (undo history, ×2, mute, fade)
+// MARK: - Track lanes (track 1 = main loop, tracks 2 and 3 synced to it)
 
-struct LoopToolsRow: View {
+struct TrackLanesView: View {
     @EnvironmentObject var looper: LooperController
 
     var body: some View {
         let snap = looper.snapshot
-        let hasLoop = snap.loopSeconds > 0
-        HStack(spacing: 8) {
-            ToolButton(symbol: "arrow.uturn.backward", title: snap.undoDepth > 0 ? "Undo \(snap.undoDepth)" : "Undo",
-                       hint: "⌘Z", enabled: snap.undoDepth > 0) { looper.undo() }
-                .help("Undo the last overdub (up to \(LayerStack.maxUndo) steps back)")
-            ToolButton(symbol: "arrow.uturn.forward", title: snap.redoDepth > 0 ? "Redo \(snap.redoDepth)" : "Redo",
-                       hint: "⇧⌘Z", enabled: snap.redoDepth > 0) { looper.redo() }
-            HistoryDots(undo: snap.undoDepth, redo: snap.redoDepth)
-            Divider().frame(height: 26)
-            ToolButton(symbol: "multiply", title: "×2", hint: "D", enabled: hasLoop && snap.state != .recording && !snap.doubling) {
-                looper.doubleLoop()
-            }
-            .help("Double the loop length: the loop is copied behind itself so you can overdub a longer phrase")
-            ToolButton(symbol: looper.allMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                       title: looper.allMuted ? "Muted" : "Mute", hint: "X", enabled: hasLoop,
-                       highlight: looper.allMuted ? UI.dub : nil) { looper.toggleDrop() }
-                .help("Mute all loop tracks while the rhythm keeps playing (drop)")
-            ToolButton(symbol: "speaker.wave.1", title: "Fade out", hint: "F",
-                       enabled: snap.state == .playing || snap.state == .overdubbing) { looper.fadeOut() }
-                .help("Fade the loop out over \(String(format: "%.1f", looper.settings.fadeSeconds)) s and stop")
-            Spacer(minLength: 0)
+        VStack(spacing: 8) {
+            MainLane(snap: snap)
+            SubLane(index: 0, snap: snap.tracks[0], main: snap)
+            SubLane(index: 1, snap: snap.tracks[1], main: snap)
         }
+        .frame(maxWidth: .infinity)
     }
 }
 
-private struct HistoryDots: View {
-    let undo: Int
-    let redo: Int
+private let laneHeight: CGFloat = 68
+private let laneHeaderWidth: CGFloat = 168
 
-    var body: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<LayerStack.maxUndo, id: \.self) { i in
-                Circle()
-                    .fill(i < undo ? UI.dub : (i < undo + redo ? UI.dub.opacity(0.25) : UI.track))
-                    .frame(width: 7, height: 7)
-            }
-        }
-        .help("Undo history: \(undo) overdub\(undo == 1 ? "" : "s") can be undone, \(redo) redone")
-    }
-}
-
-struct ToolButton: View {
-    let symbol: String
-    let title: String
-    let hint: String
-    var enabled = true
-    var highlight: Color? = nil
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 7) {
-                Image(systemName: symbol).font(.system(size: 12, weight: .semibold))
-                Text(title).font(.system(size: 12.5, weight: .semibold))
-                Text(hint).font(.system(size: 10.5)).foregroundColor(UI.muted)
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 34)
-            .background(RoundedRectangle(cornerRadius: 9).fill(highlight.map { $0.opacity(0.18) } ?? UI.well))
-            .overlay(RoundedRectangle(cornerRadius: 9).stroke(highlight ?? UI.line2, lineWidth: 1))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.45)
-        .fixedSize()
-    }
-}
-
-// MARK: - Tracks
-
-struct TracksPanel: View {
+private struct MainLane: View {
     @EnvironmentObject var looper: LooperController
+    let snap: Snapshot
 
     var body: some View {
-        let snap = looper.snapshot
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Tracks").font(.system(size: 14, weight: .bold))
-                Text("Tracks 2 and 3 play in sync with track 1 and can be any number of its cycles long.")
-                    .font(.system(size: 11)).foregroundColor(UI.muted)
-                Spacer()
-            }
-            MainTrackRow()
-            ForEach(0..<2, id: \.self) { t in
-                SubTrackRow(index: t, snap: snap.tracks[t], main: snap)
-            }
-        }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 14).fill(UI.panel))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(UI.line, lineWidth: 1))
-    }
-}
-
-private struct MainTrackRow: View {
-    @EnvironmentObject var looper: LooperController
-
-    var body: some View {
-        let snap = looper.snapshot
+        let c = UI.state(snap.state)
+        let active = snap.state == .recording || snap.state == .overdubbing
+        let pos = snap.state == .recording ? 1.0 : snap.position
         HStack(spacing: 10) {
-            Text("1").font(.system(size: 13, weight: .black, design: .monospaced))
-                .frame(width: 26, height: 26)
-                .background(RoundedRectangle(cornerRadius: 7).fill(UI.base.opacity(0.25)))
-            Text("Main loop").font(.system(size: 12.5, weight: .semibold)).frame(width: 96, alignment: .leading)
-            Text(snap.loopSeconds > 0 ? "\(snap.totalMeasures) bar\(snap.totalMeasures == 1 ? "" : "s") · \(String(format: "%.1f", snap.loopSeconds)) s" : "empty")
-                .font(.system(size: 11)).foregroundColor(UI.muted)
-            Spacer()
+            HStack(spacing: 8) {
+                Badge(text: "1", color: UI.base)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Track 1").font(.system(size: 12.5, weight: .semibold))
+                    Text(meta).font(.system(size: 10.5)).foregroundColor(UI.muted).lineLimit(1)
+                }
+            }
+            .frame(width: laneHeaderWidth, alignment: .leading)
+            Canvas { ctx, size in
+                drawBars(ctx, size, looper.baseWave, UI.base, pos, dimmed: false)
+                if snap.hasDubLayer && !looper.dubWave.isEmpty {
+                    drawBars(ctx, size, looper.dubWave, UI.dub, pos, dimmed: !snap.dubActive, scale: 0.7)
+                }
+                if snap.state == .playing || snap.state == .overdubbing {
+                    let x = size.width * CGFloat(pos)
+                    ctx.fill(Path(CGRect(x: x - 1, y: 0, width: 2, height: size.height)), with: .color(.white.opacity(0.9)))
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
             MuteButton(muted: looper.mainMuted) { looper.toggleMainMute() }
             LevelSlider(value: Binding(get: { looper.settings.loopLevel }, set: { looper.settings.loopLevel = $0 }))
         }
-        .padding(.vertical, 2)
+        .padding(.horizontal, 10)
+        .frame(height: laneHeight)
+        .background(RoundedRectangle(cornerRadius: 12).fill(UI.panel))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(active ? c : UI.line, lineWidth: active ? 1.5 : 1))
+    }
+
+    private var meta: String {
+        switch snap.state {
+        case .recording: return "recording…"
+        case .empty, .armed, .autoRecArmed: return "empty"
+        default:
+            let dubs = snap.undoDepth > 0 ? " · \(snap.undoDepth) overdub\(snap.undoDepth == 1 ? "" : "s")" : ""
+            return String(format: "%.1f s", snap.loopSeconds) + dubs
+        }
     }
 }
 
-private struct SubTrackRow: View {
+private struct SubLane: View {
     @EnvironmentObject var looper: LooperController
     let index: Int
     let snap: TrackSnapshot
@@ -131,30 +78,45 @@ private struct SubTrackRow: View {
 
     var body: some View {
         let st = snap.state
-        let stateColor: Color = st == 1 ? Color(hex: 0xFF453A) : (st == 3 ? Color(hex: 0xFF9F0A) : color)
+        let stateColor: Color = st == 1 ? UI.state(.recording) : (st == 3 ? UI.state(.overdubbing) : color)
         let k = max(1, snap.cycles)
         let pos: Double = st == 2 || st == 3
-            ? (Double(((main.masterCycle % k) + k) % k) + main.position) / Double(k) : (st == 1 ? min(1, snap.recordProgress / max(1, ceil(snap.recordProgress))) : 0)
+            ? (Double(((main.masterCycle % k) + k) % k) + main.position) / Double(k) : 0
         HStack(spacing: 10) {
-            Text("\(index + 2)").font(.system(size: 13, weight: .black, design: .monospaced))
-                .frame(width: 26, height: 26)
-                .background(RoundedRectangle(cornerRadius: 7).fill(color.opacity(0.25)))
-            Button { looper.trackPress(index) } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: symbol(st)).font(.system(size: 11, weight: .black))
-                    Text(label(st)).font(.system(size: 12, weight: .semibold))
+            HStack(spacing: 8) {
+                Badge(text: "\(index + 2)", color: color)
+                Button { looper.trackPress(index) } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: symbol(st)).font(.system(size: 10, weight: .black))
+                        Text(label(st)).font(.system(size: 11.5, weight: .semibold))
+                    }
+                    .foregroundColor(st == 0 ? UI.text : .white)
+                    .frame(width: 118, height: 30)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(st == 0 ? UI.well : stateColor.opacity(0.8)))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(st == 0 ? UI.line2 : stateColor, lineWidth: 1))
+                    .contentShape(Rectangle())
                 }
-                .foregroundColor(st == 0 ? UI.text : .white)
-                .frame(width: 112, height: 30)
-                .background(RoundedRectangle(cornerRadius: 8).fill(st == 0 ? UI.well : stateColor.opacity(0.75)))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(st == 0 ? UI.line2 : stateColor, lineWidth: 1))
-                .contentShape(Rectangle())
+                .buttonStyle(.plain)
+                .disabled(main.loopSeconds <= 0)
+                .help("Track \(index + 2): record → overdub ↔ play (key \(index + 2))")
             }
-            .buttonStyle(.plain)
-            .help("Track \(index + 2): record → overdub ↔ play (key \(index + 2))")
-            TrackWave(wave: looper.trackWaves[index], color: color, position: pos,
-                      active: st == 1 || st == 3, accent: stateColor, empty: st == 0,
-                      caption: caption(st, k))
+            .frame(width: laneHeaderWidth, alignment: .leading)
+            ZStack(alignment: .leading) {
+                Canvas { ctx, size in
+                    drawBars(ctx, size, looper.trackWaves[index], color, pos, dimmed: false)
+                    if st == 2 || st == 3 {
+                        let x = size.width * CGFloat(pos)
+                        ctx.fill(Path(CGRect(x: x - 1, y: 0, width: 2, height: size.height)), with: .color(.white.opacity(0.9)))
+                    }
+                }
+                Text(caption(st, k))
+                    .font(.system(size: 10.5))
+                    .foregroundColor(looper.trackWaves[index].isEmpty ? UI.muted : UI.text2)
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(Capsule().fill(UI.panel.opacity(looper.trackWaves[index].isEmpty ? 0 : 0.8)))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
             IconTool(symbol: "arrow.uturn.backward", enabled: snap.undoDepth > 0, help: "Undo on track \(index + 2)") { looper.trackUndo(index) }
             IconTool(symbol: "arrow.uturn.forward", enabled: snap.redoDepth > 0, help: "Redo on track \(index + 2)") { looper.trackRedo(index) }
             IconTool(symbol: "trash", enabled: st != 0, help: "Clear track \(index + 2)") { looper.trackClear(index) }
@@ -162,14 +124,18 @@ private struct SubTrackRow: View {
             LevelSlider(value: Binding(get: { looper.settings.trackLevels.count > index ? looper.settings.trackLevels[index] : 1 },
                                        set: { looper.setTrackLevel(index, $0) }))
         }
+        .padding(.horizontal, 10)
+        .frame(height: laneHeight)
+        .background(RoundedRectangle(cornerRadius: 12).fill(UI.panel))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(st == 1 || st == 3 ? stateColor : UI.line, lineWidth: st == 1 || st == 3 ? 1.5 : 1))
     }
 
     private func caption(_ st: Int, _ k: Int) -> String {
         switch st {
-        case 0: return looper.snapshot.loopSeconds > 0 ? "Press Record to add a part in sync with track 1" : "Record track 1 first"
-        case 1: return snap.stopRequested ? "closes at the end of this cycle…" : "recording · \(String(format: "%.1f", snap.recordProgress)) cycles"
-        case 3: return "overdubbing · \(k) cycle\(k == 1 ? "" : "s")"
-        default: return "\(k) cycle\(k == 1 ? "" : "s") of track 1 · \(String(format: "%.1f", snap.seconds)) s"
+        case 0: return main.loopSeconds > 0 ? "Record a part in sync with track 1" : "Record track 1 first"
+        case 1: return snap.stopRequested ? "closes at the loop end…" : "recording · \(String(format: "%.1f", snap.recordProgress)) × track 1"
+        case 3: return "overdubbing · \(k) × track 1"
+        default: return "\(k) × track 1 · \(String(format: "%.1f", snap.seconds)) s"
         }
     }
 
@@ -192,52 +158,63 @@ private struct SubTrackRow: View {
     }
 }
 
-private struct TrackWave: View {
-    let wave: [Float]
+private struct Badge: View {
+    let text: String
     let color: Color
-    let position: Double
-    let active: Bool
-    let accent: Color
-    let empty: Bool
-    let caption: String
+    var body: some View {
+        Text(text).font(.system(size: 13, weight: .black, design: .monospaced))
+            .frame(width: 26, height: 26)
+            .background(RoundedRectangle(cornerRadius: 7).fill(color.opacity(0.28)))
+    }
+}
+
+/// Waveform bars across a lane.
+private func drawBars(_ ctx: GraphicsContext, _ size: CGSize, _ wave: [Float], _ color: Color, _ position: Double,
+                      dimmed: Bool, scale: CGFloat = 1) {
+    guard !wave.isEmpty else {
+        ctx.fill(Path(CGRect(x: 0, y: size.height / 2 - 1, width: size.width, height: 2)), with: .color(UI.track))
+        return
+    }
+    let n = 120
+    let w = size.width / CGFloat(n)
+    for i in 0..<n {
+        let a0 = i * wave.count / n
+        let a1 = max(a0 + 1, (i + 1) * wave.count / n)
+        let v = wave[a0..<min(a1, wave.count)].max() ?? 0
+        let f = Double(i) / Double(n)
+        let h = max(2, CGFloat(sqrt(Double(v))) * (size.height - 4) * scale)
+        let rect = CGRect(x: CGFloat(i) * w, y: (size.height - h) / 2, width: max(1, w - 1.4), height: h)
+        let col = dimmed ? UI.track : color
+        ctx.fill(Path(roundedRect: rect, cornerRadius: 1.2), with: .color(col.opacity(dimmed ? 0.5 : (f <= position ? 0.95 : 0.38))))
+    }
+}
+
+// MARK: - Control row buttons
+
+struct ActionButton: View {
+    let symbol: String
+    let title: String
+    var enabled = true
+    var active: Color? = nil
+    var help = ""
+    let action: () -> Void
 
     var body: some View {
-        ZStack(alignment: .leading) {
-            Canvas { ctx, size in
-                guard !wave.isEmpty else { return }
-                let n = 100
-                let w = size.width / CGFloat(n)
-                for i in 0..<n {
-                    let a0 = i * wave.count / n
-                    let a1 = max(a0 + 1, (i + 1) * wave.count / n)
-                    let v = wave[a0..<min(a1, wave.count)].max() ?? 0
-                    let h = max(2, CGFloat(sqrt(Double(v))) * (size.height - 8))
-                    let f = Double(i) / Double(n)
-                    ctx.fill(Path(roundedRect: CGRect(x: CGFloat(i) * w, y: (size.height - h) / 2, width: max(1, w - 1.2), height: h),
-                                  cornerRadius: 1),
-                             with: .color(color.opacity(f <= position ? 0.95 : 0.4)))
-                }
-                if !empty {
-                    let x = size.width * CGFloat(position)
-                    ctx.fill(Path(CGRect(x: x - 1, y: 0, width: 2, height: size.height)), with: .color(.white.opacity(0.85)))
-                }
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: symbol).font(.system(size: 15, weight: .semibold))
+                Text(title).font(.system(size: 11, weight: .semibold)).lineLimit(1)
             }
-            if wave.isEmpty {
-                Text(caption).font(.system(size: 11)).foregroundColor(UI.muted).padding(.leading, 10)
-            } else {
-                Text(caption).font(.system(size: 10, weight: .medium)).foregroundColor(UI.text2)
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Capsule().fill(UI.panel.opacity(0.8)))
-                    .padding(.leading, 6)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .padding(.top, 4)
-            }
+            .foregroundColor(active.map { _ in Color.white } ?? UI.text)
+            .frame(width: 70, height: 56)
+            .background(RoundedRectangle(cornerRadius: 12).fill(active.map { $0.opacity(0.8) } ?? UI.well))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(active ?? UI.line2, lineWidth: 1))
+            .contentShape(Rectangle())
         }
-        .frame(height: 44)
-        .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: 9).fill(UI.well))
-        .overlay(RoundedRectangle(cornerRadius: 9).stroke(active ? accent : UI.line, lineWidth: active ? 1.5 : 1))
-        .clipShape(RoundedRectangle(cornerRadius: 9))
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.4)
+        .help(help)
     }
 }
 
@@ -287,7 +264,7 @@ private struct LevelSlider: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Slider(value: $value, in: 0...2).frame(width: 110)
+            Slider(value: $value, in: 0...2).frame(width: 78)
             Text("\(Int((value * 100).rounded()))%").font(.system(size: 11)).monospacedDigit()
                 .foregroundColor(UI.muted).frame(width: 38, alignment: .trailing)
         }
@@ -296,6 +273,22 @@ private struct LevelSlider: View {
 }
 
 // MARK: - Effects
+
+/// The Effects window (menu Effects › Effects…).
+struct EffectsWindow: View {
+    @EnvironmentObject var looper: LooperController
+
+    var body: some View {
+        EffectsPanel()
+            .padding(14)
+            .frame(width: 720)
+            .background(ThemeBackground(theme: looper.appTheme, stateColor: UI.state(looper.snapshot.state), live: false))
+            .foregroundColor(UI.text)
+            .preferredColorScheme(UI.light ? .light : .dark)
+            .tint(UI.rhythm)
+            .id(looper.appTheme)
+    }
+}
 
 struct EffectsPanel: View {
     @EnvironmentObject var looper: LooperController

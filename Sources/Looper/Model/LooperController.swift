@@ -19,7 +19,7 @@ enum SideTab: String, CaseIterable, Identifiable {
 
 /// Main-thread brain of the app: pedal logic, memories, settings, MIDI, UI snapshot.
 final class LooperController: ObservableObject {
-    static let version = "2.0-beta.10"
+    static let version = "2.0-beta.11"
     #if arch(arm64)
     static let architecture = "Apple silicon (arm64)"
     #else
@@ -203,6 +203,7 @@ final class LooperController: ObservableObject {
         applyGlobals()
 
         midi.onMessage = { [weak self] s, a, b in self?.handleMIDI(s, a, b) }
+        AppDelegate.onSelectTheme = { [weak self] t in self?.appTheme = t }
         midi.onClockTempo = { [weak self] t in self?.receivedClockTempo(t) }
         audio.onConfigurationChange = { [weak self] in
             guard let self else { return }

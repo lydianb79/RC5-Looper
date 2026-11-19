@@ -109,3 +109,69 @@ extension LooperController {
         if waves != trackWaves { trackWaves = waves }
     }
 }
+
+/// The on-screen Record button only records; overdub, play and the rest have their own buttons.
+/// (R / Return keep the RC-5 pedal behaviour: record → overdub → play.)
+extension LooperController {
+    var canRecord: Bool {
+        switch snapshot.state {
+        case .empty, .armed, .autoRecArmed, .recording: return true
+        default: return false
+        }
+    }
+
+    var recordLabel: String {
+        switch snapshot.state {
+        case .empty: return settings.autoRec ? "Arm auto rec" : "Record"
+        case .armed, .autoRecArmed: return "Cancel"
+        case .recording:
+            return settings.loopLength > 0 ? "Recording…" : "Close loop"
+        default: return "Record"
+        }
+    }
+
+    var recordHint: String {
+        switch snapshot.state {
+        case .empty: return settings.countIn ? "starts after the count-in" : "R or Return"
+        case .armed, .autoRecArmed: return "waiting to start"
+        case .recording:
+            if settings.loopLength > 0 { return "stops after \(LoopLengthOptions.label(settings.loopLength))" }
+            return settings.recAction == .recDubPlay && !settings.oneShot ? "then overdub" : "then play"
+        default: return "clear the loop to record a new one"
+        }
+    }
+
+    func recordOnly() {
+        switch core.state {
+        case .empty:
+            if !inputGranted { flash("No audio input — check microphone permission") }
+            core.send(.armRecording)
+        case .armed, .autoRecArmed:
+            core.send(.cancelArm)
+        case .recording:
+            let next: LoopState = settings.recAction == .recDubPlay && !settings.oneShot ? .overdubbing : .playing
+            core.send(.finishRecording(next: next))
+        default:
+            flash("Use Overdub to add to the loop, or Clear to record a new one")
+        }
+    }
+
+    func overdubToggle() {
+        switch core.state {
+        case .playing: core.send(.startOverdub)
+        case .overdubbing: core.send(.stopOverdub)
+        case .stopped:
+            core.send(.play)
+            core.send(.startOverdub)
+        default: break
+        }
+    }
+}
+
+extension LooperController {
+    func toggleFX(input: Bool) {
+        if input { settings.inputFX.on.toggle() } else { settings.loopFX.on.toggle() }
+        let f = input ? settings.inputFX : settings.loopFX
+        flash("\(input ? "Input" : "Loop") FX \(f.type.label) \(f.on ? "ON" : "OFF")")
+    }
+}

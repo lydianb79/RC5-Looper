@@ -107,11 +107,9 @@ struct StudioView: View {
                         .overlay(alignment: .trailing) { Rectangle().fill(UI.line).frame(width: 1) }
                         .transition(.move(edge: .leading))
                 }
-                ScrollView(.vertical) {
-                    StageView()
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 22)
-                }
+                StageView()
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 16)
             }
             StudioFooter()
         }
@@ -527,19 +525,17 @@ private struct StageView: View {
     @EnvironmentObject var looper: LooperController
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 14) {
             TitleRow()
-            HStack(alignment: .center, spacing: 22) {
-                HeroRing().frame(width: 300, height: 300)
-                LanesView()
+            HStack(alignment: .center, spacing: 20) {
+                HeroRing().frame(width: 228, height: 228)
+                TrackLanesView()
             }
-            PerformanceRow()
-            LoopToolsRow()
-            if looper.showTracks { TracksPanel().transition(.opacity) }
+            ControlRow()
             if looper.showRhythm { RhythmPanel().transition(.opacity) }
-            if looper.showEffects { EffectsPanel().transition(.opacity) }
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: 1400, alignment: .leading)
+        .frame(maxWidth: 1400, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
@@ -603,8 +599,8 @@ private struct HeroRing: View {
         ZStack {
             Circle()
                 .fill(c)
-                .frame(width: 230, height: 230)
-                .blur(radius: 42)
+                .frame(width: 190, height: 190)
+                .blur(radius: 36)
                 .opacity(pulse)
             RingCanvas(wave: looper.waveform, position: snap.state == .recording ? 1 : snap.position,
                        color: c, measures: snap.totalMeasures, reverse: looper.settings.reverse,
@@ -615,7 +611,7 @@ private struct HeroRing: View {
                     .tracking(1.8)
                     .foregroundColor(c)
                 Text(snap.state == .armed && snap.countdownBeats > 0 ? "\(snap.countdownBeats)" : "\(snap.measure).\(snap.beat)")
-                    .font(.system(size: 36, weight: .bold, design: .monospaced))
+                    .font(.system(size: 30, weight: .bold, design: .monospaced))
                     .monospacedDigit()
                 Text(subtitle(snap))
                     .font(.system(size: 11.5))
@@ -633,10 +629,10 @@ private struct HeroRing: View {
 
     private func subtitle(_ s: Snapshot) -> String {
         switch s.state {
-        case .empty: return "press R to record"
+        case .empty: return "press R"
         case .armed: return "recording starts on beat 1"
         case .recording: return fmtTime(s.recordSeconds)
-        default: return s.totalMeasures > 0 ? "bar · beat of \(s.totalMeasures) bar\(s.totalMeasures == 1 ? "" : "s")" : "bar · beat"
+        default: return s.totalMeasures > 0 ? "of \(s.totalMeasures) bar\(s.totalMeasures == 1 ? "" : "s")" : "bar · beat"
         }
     }
 }
@@ -702,201 +698,74 @@ private struct RingCanvas: View {
 }
 
 /// Timeline lanes: committed audio and the undoable overdub layer, with a sweeping playhead.
-private struct LanesView: View {
-    @EnvironmentObject var looper: LooperController
-    private let headerWidth: CGFloat = 124
-
-    var body: some View {
-        let snap = looper.snapshot
-        let stateC = UI.state(snap.state)
-        let pos = snap.state == .recording ? 1.0 : snap.position
-        let showHead = snap.state == .playing || snap.state == .overdubbing
-        VStack(spacing: 8) {
-            LaneView(title: "Base", meta: baseMeta(snap), color: UI.base, wave: looper.baseWave, position: pos,
-                     glow: showHead, active: snap.state == .recording, activeColor: stateC, dimmed: false, headerWidth: headerWidth)
-            if snap.hasDubLayer {
-                LaneView(title: "Overdub", meta: dubMeta(snap), color: UI.dub, wave: looper.dubWave, position: pos,
-                         glow: showHead && snap.dubActive, active: snap.state == .overdubbing, activeColor: stateC,
-                         dimmed: !snap.dubActive, headerWidth: headerWidth)
-            } else {
-                EmptyLane(headerWidth: headerWidth, canDub: snap.state == .playing || snap.state == .stopped)
-            }
-        }
-        .overlay {
-            if showHead {
-                GeometryReader { geo in
-                    let x = headerWidth + (geo.size.width - headerWidth - 10) * CGFloat(pos)
-                    Rectangle()
-                        .fill(Color.white)
-                        .frame(width: 2)
-                        .shadow(color: .white.opacity(0.7), radius: 5)
-                        .position(x: x, y: geo.size.height / 2)
-                        .frame(height: geo.size.height)
-                }
-                .allowsHitTesting(false)
-            }
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func baseMeta(_ s: Snapshot) -> String {
-        switch s.state {
-        case .recording: return "recording…"
-        case .empty, .armed, .autoRecArmed: return "empty"
-        default: return "\(fmtTime(s.loopSeconds)) · committed"
-        }
-    }
-
-    private func dubMeta(_ s: Snapshot) -> String {
-        if s.state == .overdubbing { return "recording…" }
-        return s.dubActive ? "last take · ⌘Z undoes" : "undone · ⌘Z redoes"
-    }
-}
-
-private struct LaneView: View {
-    let title: String
-    let meta: String
-    let color: Color
-    let wave: [Float]
-    let position: Double
-    let glow: Bool
-    let active: Bool
-    let activeColor: Color
-    let dimmed: Bool
-    let headerWidth: CGFloat
-
-    var body: some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 7) {
-                    RoundedRectangle(cornerRadius: 3).fill(dimmed ? UI.dim : color).frame(width: 9, height: 9)
-                    Text(title).font(.system(size: 12.5, weight: .semibold))
-                }
-                Text(meta).font(.system(size: 11)).foregroundColor(UI.muted).lineLimit(1)
-            }
-            .padding(.leading, 12)
-            .frame(width: headerWidth, alignment: .leading)
-            Canvas { ctx, size in
-                let n = 120
-                guard !wave.isEmpty else {
-                    ctx.fill(Path(CGRect(x: 0, y: size.height / 2 - 1, width: size.width, height: 2)), with: .color(UI.track))
-                    return
-                }
-                let w = size.width / CGFloat(n)
-                for i in 0..<n {
-                    let a0 = i * wave.count / n
-                    let a1 = max(a0 + 1, (i + 1) * wave.count / n)
-                    let v = wave[a0..<min(a1, wave.count)].max() ?? 0
-                    let f = Double(i) / Double(n)
-                    let h = max(2, CGFloat(sqrt(Double(v))) * (size.height - 16))
-                    let rect = CGRect(x: CGFloat(i) * w, y: (size.height - h) / 2, width: max(1, w - 1.5), height: h)
-                    let near = glow && abs(f - position) < 0.02
-                    let opacity = dimmed ? 0.35 : (near ? 1 : (f <= position ? 0.95 : 0.32))
-                    let col = dimmed ? UI.track : color
-                    if near {
-                        var g = ctx
-                        g.addFilter(.shadow(color: col, radius: 5))
-                        g.fill(Path(roundedRect: rect, cornerRadius: 1.5), with: .color(col.opacity(opacity)))
-                    } else {
-                        ctx.fill(Path(roundedRect: rect, cornerRadius: 1.5), with: .color(col.opacity(opacity)))
-                    }
-                }
-            }
-            .padding(.trailing, 10)
-        }
-        .frame(height: 78)
-        .background(RoundedRectangle(cornerRadius: 12).fill(UI.panel))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(active ? activeColor : UI.line, lineWidth: active ? 1.5 : 1))
-        .shadow(color: active ? activeColor.opacity(0.25) : .clear, radius: 12)
-    }
-}
-
-private struct EmptyLane: View {
-    let headerWidth: CGFloat
-    let canDub: Bool
-
-    var body: some View {
-        HStack(spacing: 0) {
-            HStack(spacing: 7) {
-                RoundedRectangle(cornerRadius: 3).stroke(UI.dub.opacity(0.6), lineWidth: 1).frame(width: 9, height: 9)
-                Text("Overdub").font(.system(size: 12.5, weight: .semibold)).foregroundColor(UI.muted)
-            }
-            .padding(.leading, 12)
-            .frame(width: headerWidth, alignment: .leading)
-            Text(canDub ? "Press R while playing to record an overdub layer" : "Overdubs appear here as an undoable layer")
-                .font(.system(size: 12))
-                .foregroundColor(UI.muted)
-            Spacer()
-        }
-        .frame(height: 78)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(UI.line2, style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
-    }
-}
-
 // MARK: - Performance row
 
-private struct PerformanceRow: View {
+private struct ControlRow: View {
     @EnvironmentObject var looper: LooperController
 
     var body: some View {
         let snap = looper.snapshot
-        let c = UI.state(snap.state == .empty ? .recording : snap.state)
+        let canRec = looper.canRecord
+        let recC = UI.state(.recording)
+        let hasLoop = snap.loopSeconds > 0
         let live = snap.state == .playing || snap.state == .overdubbing || snap.state == .recording || snap.state == .armed
-        HStack(spacing: 12) {
-            MomentarySwitch(onDown: { looper.pedalDown() }, onUp: { looper.pedalUp() }) { pressed in
-                HStack(spacing: 14) {
-                    Image(systemName: actionSymbol(snap.state))
-                        .font(.system(size: 16, weight: .black))
-                        .foregroundColor(Color(hex: 0x121215))
-                        .frame(width: 38, height: 38)
-                        .background(Circle().fill(c))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(looper.nextActionLabel).font(.system(size: 18, weight: .bold))
-                        Text("hold 2 s: undo / clear  ·  double-press: stop")
-                            .font(.system(size: 11.5))
-                            .foregroundColor(UI.text2)
+        HStack(spacing: 8) {
+            Button { looper.recordOnly() } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: recordSymbol(snap.state))
+                        .font(.system(size: 14, weight: .black))
+                        .foregroundColor(.white)
+                        .frame(width: 34, height: 34)
+                        .background(Circle().fill(canRec ? recC : UI.dim))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(looper.recordLabel).font(.system(size: 16, weight: .bold))
+                        Text(looper.recordHint).font(.system(size: 10.5)).foregroundColor(UI.text2).lineLimit(1)
                     }
-                    Spacer(minLength: 8)
-                    Text("R")
-                        .font(.system(size: 12, weight: .medium))
-                        .padding(.horizontal, 9).padding(.vertical, 4)
-                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(UI.line2, lineWidth: 1))
+                    Spacer(minLength: 0)
                 }
-                .padding(.horizontal, 18)
-                .frame(width: 400, height: 66)
-                .background(RoundedRectangle(cornerRadius: 16).fill(UI.tint(snap.state == .empty ? .recording : snap.state)))
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(c, lineWidth: 1.5))
-                .shadow(color: c.opacity(live ? 0.3 : 0.12), radius: pressed ? 6 : 16)
-                .scaleEffect(pressed ? 0.98 : 1)
-                .animation(.easeOut(duration: 0.08), value: pressed)
-            }
-            .help("Record / overdub (R or Return)")
-
-            Button { looper.playStop() } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: playStopSymbol(snap))
-                        .font(.system(size: 13, weight: .bold))
-                    Text(looper.playStopLabel).font(.system(size: 14, weight: .semibold))
-                    Text("Space").font(.system(size: 11)).foregroundColor(UI.muted)
-                }
-                .padding(.horizontal, 16)
-                .frame(height: 52)
-                .background(RoundedRectangle(cornerRadius: 12).fill(UI.well))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(UI.line2, lineWidth: 1))
+                .padding(.horizontal, 12)
+                .frame(width: 236, height: 56)
+                .background(RoundedRectangle(cornerRadius: 14).fill(canRec ? UI.tint(.recording) : UI.well))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(canRec ? recC : UI.line2, lineWidth: 1.5))
+                .shadow(color: snap.state == .recording ? recC.opacity(0.35) : .clear, radius: 12)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Play / stop (Space)")
-            Button { looper.clear() } label: {
-                SecondaryLabel(title: "Clear", hint: "⌘⌫", pressed: false, highlight: nil)
-            }
-            .buttonStyle(.plain)
-            Spacer(minLength: 8)
+            .opacity(canRec ? 1 : 0.6)
+            .help("Record a new loop. (The R key works like the RC-5 pedal: record → overdub → play.)")
+
+            ActionButton(symbol: playSymbol(snap), title: playTitle(snap), help: "Play / stop (Space)") { looper.playStop() }
+            ActionButton(symbol: "plus.circle", title: snap.state == .overdubbing ? "Stop dub" : "Overdub",
+                         enabled: snap.state == .playing || snap.state == .overdubbing || snap.state == .stopped,
+                         active: snap.state == .overdubbing ? UI.state(.overdubbing) : nil,
+                         help: "Overdub on track 1") { looper.overdubToggle() }
+            ActionButton(symbol: "trash", title: "Clear", enabled: hasLoop || snap.state == .recording,
+                         help: "Clear all tracks (⌘⌫)") { looper.clear() }
+            ActionButton(symbol: "arrow.uturn.backward", title: snap.undoDepth > 0 ? "Undo \(snap.undoDepth)" : "Undo",
+                         enabled: snap.undoDepth > 0, help: "Undo the last overdub, up to \(LayerStack.maxUndo) steps (⌘Z)") { looper.undo() }
+            ActionButton(symbol: "arrow.uturn.forward", title: "Redo", enabled: snap.redoDepth > 0,
+                         help: "Redo (⇧⌘Z)") { looper.redo() }
+            ActionButton(symbol: "multiply", title: "×2 length", enabled: hasLoop && snap.state != .recording && !snap.doubling,
+                         help: "Double the loop length so you can overdub a longer phrase (D)") { looper.doubleLoop() }
+            ActionButton(symbol: looper.allMuted ? "speaker.slash.fill" : "speaker.wave.2.fill", title: looper.allMuted ? "Muted" : "Mute",
+                         enabled: hasLoop, active: looper.allMuted ? UI.dub : nil,
+                         help: "Mute all tracks, the rhythm keeps playing (X)") { looper.toggleDrop() }
+            ActionButton(symbol: "speaker.wave.1", title: "Fade out", enabled: snap.state == .playing || snap.state == .overdubbing,
+                         help: "Fade out and stop (F)") { looper.fadeOut() }
+            Spacer(minLength: 6)
             BeatLights(count: snap.beatsPerMeasure, current: live ? snap.beat : 0, color: UI.state(snap.state))
         }
     }
 
-    private func playStopSymbol(_ s: Snapshot) -> String {
+    private func recordSymbol(_ s: LoopState) -> String {
+        switch s {
+        case .recording: return "stop.fill"
+        case .armed, .autoRecArmed: return "xmark"
+        default: return "circle.fill"
+        }
+    }
+
+    private func playSymbol(_ s: Snapshot) -> String {
         switch s.state {
         case .playing, .overdubbing: return "stop.fill"
         case .empty: return s.rhythmRunning ? "stop.fill" : "play.fill"
@@ -905,13 +774,13 @@ private struct PerformanceRow: View {
         }
     }
 
-    private func actionSymbol(_ s: LoopState) -> String {
-        switch s {
-        case .empty: return "circle.fill"
-        case .armed, .autoRecArmed: return "xmark"
-        case .recording: return "arrow.triangle.2.circlepath"
-        case .playing: return looper.settings.oneShot ? "arrow.counterclockwise" : "plus"
-        case .overdubbing, .stopped: return "play.fill"
+    private func playTitle(_ s: Snapshot) -> String {
+        switch s.state {
+        case .playing, .overdubbing: return "Stop"
+        case .empty: return s.rhythmRunning ? "Stop" : "Play"
+        case .armed, .autoRecArmed: return "Cancel"
+        case .recording: return "Play"
+        case .stopped: return "Play"
         }
     }
 }
@@ -966,7 +835,7 @@ private struct RhythmPanel: View {
     var body: some View {
         let s = looper.settings
         let pattern = RhythmLibrary.pattern(s.rhythmPattern)
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 Toggle("", isOn: $looper.settings.rhythmOn).toggleStyle(.switch).labelsHidden().controlSize(.small)
                 Text("Rhythm").font(.system(size: 14, weight: .bold))
@@ -980,21 +849,6 @@ private struct RhythmPanel: View {
                     .layoutPriority(2)
                     .help("Play or stop the rhythm on its own (Space)")
                 }
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(RhythmLibrary.categories, id: \.self) { cat in
-                            let selected = pattern.category == cat
-                            Button(cat) {
-                                if let i = RhythmLibrary.indices(in: cat).first { looper.selectPattern(i) }
-                            }
-                            .buttonStyle(ChipButtonStyle(selected: selected))
-                            .fixedSize()
-                        }
-                    }
-                    .padding(.vertical, 2)
-                }
-            }
-            HStack(spacing: 10) {
                 Menu {
                     ForEach(RhythmLibrary.categories, id: \.self) { cat in
                         Menu(cat) {
@@ -1033,27 +887,40 @@ private struct RhythmPanel: View {
                 .labelsHidden()
                 .frame(width: 90)
                 Spacer(minLength: 8)
+                HStack(spacing: 5) {
+                    Text("Feel").font(.system(size: 11)).foregroundColor(UI.muted)
+                    Slider(value: $looper.settings.rhythmHumanize, in: 0...1).frame(width: 80)
+                        .help("Humanize: 0 = rigid drum machine, right = a drummer's natural timing and dynamics")
+                }
+                HStack(spacing: 5) {
+                    Text("Room").font(.system(size: 11)).foregroundColor(UI.muted)
+                    Slider(value: $looper.settings.rhythmReverb, in: 0...1).frame(width: 70)
+                }
+                HStack(spacing: 5) {
+                    Text("Level").font(.system(size: 11)).foregroundColor(UI.muted)
+                    Slider(value: $looper.settings.rhythmLevel, in: 0...2).frame(width: 90)
+                }
+            }
+            HStack(spacing: 10) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(RhythmLibrary.categories, id: \.self) { cat in
+                            let selected = pattern.category == cat
+                            Button(cat) {
+                                if let i = RhythmLibrary.indices(in: cat).first { looper.selectPattern(i) }
+                            }
+                            .buttonStyle(ChipButtonStyle(selected: selected))
+                            .fixedSize()
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                Spacer(minLength: 8)
                 ToggleChip(title: "Edit", isOn: $looper.editingPattern)
                     .help("Edit the pattern: click steps to cycle accent → normal → ghost → off. Built-in patterns are copied to your User patterns first.")
                 ToggleChip(title: "Intro", isOn: $looper.settings.rhythmIntro)
                 ToggleChip(title: "Ending", isOn: $looper.settings.rhythmEnding)
                 ToggleChip(title: "Count-in", isOn: $looper.settings.countIn)
-            }
-            HStack(spacing: 18) {
-                HStack(spacing: 6) {
-                    Text("Feel").font(.system(size: 11)).foregroundColor(UI.muted)
-                    Slider(value: $looper.settings.rhythmHumanize, in: 0...1).frame(width: 80)
-                        .help("Humanize: 0 = rigid drum machine, right = a drummer's natural timing and dynamics")
-                }
-                HStack(spacing: 6) {
-                    Text("Room").font(.system(size: 11)).foregroundColor(UI.muted)
-                    Slider(value: $looper.settings.rhythmReverb, in: 0...1).frame(width: 70)
-                }
-                HStack(spacing: 6) {
-                    Text("Level").font(.system(size: 11)).foregroundColor(UI.muted)
-                    Slider(value: $looper.settings.rhythmLevel, in: 0...2).frame(width: 90)
-                }
-                Spacer(minLength: 0)
             }
             if looper.editingPattern {
                 Text(looper.currentIsUserPattern
@@ -1066,7 +933,7 @@ private struct RhythmPanel: View {
                      step: looper.snapshot.rhythmStep, names: Self.drumNames, core: looper.core,
                      editing: looper.editingPattern, version: looper.patternsVersion) { d, i in looper.toggleCell(drum: d, step: i) }
         }
-        .padding(16)
+        .padding(14)
         .background(RoundedRectangle(cornerRadius: 14).fill(UI.panel))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(UI.line, lineWidth: 1))
     }
@@ -1091,11 +958,11 @@ private struct StepGrid: View {
             (0..<steps).contains { core.rhythm.cell(pattern: pattern, variation: 0, drum: d, step: $0) > 0 ||
                 core.rhythm.cell(pattern: pattern, variation: 1, drum: d, step: $0) > 0 }
         }
-        VStack(spacing: 4) {
+        VStack(spacing: 3) {
             ForEach(rows, id: \.self) { d in
-                HStack(spacing: 4) {
+                HStack(spacing: 3) {
                     Text(names[d])
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 10.5, weight: .semibold))
                         .foregroundColor(UI.text2)
                         .frame(width: 64, alignment: .leading)
                     ForEach(0..<steps, id: \.self) { i in
@@ -1118,7 +985,7 @@ private struct StepGrid: View {
             : (i % spb == 0 ? UI.well : UI.wellAlt)
         RoundedRectangle(cornerRadius: 5)
             .fill(current && hit ? Color.white : base)
-            .frame(height: 22)
+            .frame(height: editing ? 15 : 17)
             .overlay(RoundedRectangle(cornerRadius: 5).stroke(current ? (hit ? Color.white : UI.dim) : (editing ? UI.line2 : Color.clear), lineWidth: current ? 2 : 1))
             .shadow(color: current && hit ? UI.base : .clear, radius: 6)
     }

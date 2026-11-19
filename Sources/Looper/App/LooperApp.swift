@@ -10,7 +10,7 @@ struct LooperApp: App {
         WindowGroup("Looper") {
             ContentView()
                 .environmentObject(looper)
-                .frame(minWidth: 1120, minHeight: 720)
+                .frame(minWidth: 1180, minHeight: 800)
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1440, height: 920)
@@ -20,6 +20,13 @@ struct LooperApp: App {
             SettingsView()
                 .environmentObject(looper)
         }
+
+        Window("Effects", id: "effects") {
+            EffectsWindow()
+                .environmentObject(looper)
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.topTrailing)
     }
 }
 
@@ -32,6 +39,63 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+        // SwiftUI rebuilds the menu bar now and then; put the Theme submenu back whenever it is missing.
+        NotificationCenter.default.addObserver(forName: NSApplication.didUpdateNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.ensureThemeMenu()
+        }
+        ensureThemeMenu()
+    }
+
+    // MARK: View › Theme (AppKit, so the submenu always works)
+
+    /// Set by the controller: applies a theme picked in the menu.
+    static var onSelectTheme: ((AppTheme) -> Void)?
+    private var themeItem: NSMenuItem?
+
+    private func makeThemeItem() -> NSMenuItem {
+        let item = NSMenuItem(title: "Theme", action: nil, keyEquivalent: "")
+        let menu = NSMenu(title: "Theme")
+        menu.delegate = self
+        for (i, t) in AppTheme.allCases.enumerated() {
+            let mi = NSMenuItem(title: t.label, action: #selector(selectTheme(_:)), keyEquivalent: i < 9 ? String(i + 1) : "")
+            mi.keyEquivalentModifierMask = [.control, .command]
+            mi.target = self
+            mi.tag = i
+            menu.addItem(mi)
+        }
+        item.submenu = menu
+        return item
+    }
+
+    private func ensureThemeMenu() {
+        guard let view = NSApp.mainMenu?.items.first(where: { $0.title == "View" })?.submenu else { return }
+        if let item = themeItem, item.menu === view { return }
+        let item = themeItem ?? makeThemeItem()
+        item.menu?.removeItem(item)
+        themeItem = item
+        // after "Show / Hide Rhythm Panel", else at the end
+        if let anchor = view.items.firstIndex(where: { $0.title.contains("Rhythm Panel") }) {
+            view.insertItem(item, at: anchor + 1)
+        } else {
+            view.addItem(item)
+        }
+    }
+
+    @objc private func selectTheme(_ sender: NSMenuItem) {
+        let all = AppTheme.allCases
+        guard sender.tag >= 0 && sender.tag < all.count else { return }
+        AppDelegate.onSelectTheme?(all[sender.tag])
+    }
+}
+
+extension AppDelegate: NSMenuDelegate {
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        let current = UserDefaults.standard.string(forKey: "appTheme") ?? AppTheme.midnight.rawValue
+        for item in menu.items {
+            let all = AppTheme.allCases
+            guard item.tag >= 0 && item.tag < all.count else { continue }
+            item.state = all[item.tag].rawValue == current ? .on : .off
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
@@ -45,8 +109,7 @@ struct LooperCommands: Commands {
     @AppStorage("appTheme") private var themeName = AppTheme.midnight.rawValue
     @AppStorage("showSidebar") private var sidebarShown = true
     @AppStorage("showRhythm") private var rhythmShown = true
-    @AppStorage("showTracks") private var tracksShown = true
-    @AppStorage("showEffects") private var fxShown = true
+    @Environment(\.openWindow) private var openWindow
 
     static func showAbout() {
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "–"
@@ -87,23 +150,8 @@ struct LooperCommands: Commands {
                 .keyboardShortcut("s", modifiers: [.control, .command])
             Button(rhythmShown ? "Hide Rhythm Panel" : "Show Rhythm Panel") { looper.showRhythm.toggle() }
                 .keyboardShortcut("r", modifiers: [.control, .command])
-            Button(tracksShown ? "Hide Tracks" : "Show Tracks") { looper.showTracks.toggle() }
-                .keyboardShortcut("t", modifiers: [.control, .command])
-            Button(fxShown ? "Hide Effects" : "Show Effects") { looper.showEffects.toggle() }
-                .keyboardShortcut("e", modifiers: [.control, .command])
+
             Divider()
-            // The menu bar no longer observes the controller (see above), so it is only rebuilt
-            // when one of the values it shows changes and the submenu stays open.
-            Menu("Theme") {
-                ForEach(Array(AppTheme.allCases.enumerated()), id: \.element) { i, t in
-                    if i < 9 {
-                        Button((themeName == t.rawValue ? "✓  " : "     ") + t.label) { looper.appTheme = t }
-                            .keyboardShortcut(KeyEquivalent(Character(String(i + 1))), modifiers: [.control, .command])
-                    } else {
-                        Button((themeName == t.rawValue ? "✓  " : "     ") + t.label) { looper.appTheme = t }
-                    }
-                }
-            }
             Divider()
         }
         CommandGroup(replacing: .undoRedo) {
@@ -111,6 +159,13 @@ struct LooperCommands: Commands {
                 .keyboardShortcut("z", modifiers: .command)
             Button("Redo Overdub") { looper.redo() }
                 .keyboardShortcut("z", modifiers: [.command, .shift])
+        }
+        CommandMenu("Effects") {
+            Button("Effects…") { openWindow(id: "effects") }
+                .keyboardShortcut("f", modifiers: [.command, .option])
+            Divider()
+            Button("Input FX On / Off") { looper.toggleFX(input: true) }
+            Button("Loop FX On / Off") { looper.toggleFX(input: false) }
         }
         CommandMenu("Looper") {
             Button("Play / Stop  (Space)") { looper.playStop() }
