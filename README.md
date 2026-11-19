@@ -8,7 +8,7 @@ A native SwiftUI + AVAudioEngine app for macOS 13+ (Apple silicon and Intel). It
 
 *The pedal panel (display, LOOP/RHYTHM knobs, memory and rhythm keys, the big pedal, STOP/UNDO/CLEAR) with the Rhythm tab open.*
 
-**Current version: 1.9**. Highlights:
+**Current version: 1.9.1**. Highlights:
 - **Looping:** overdub/replace with undo, and a live loop tempo (keep pitch or varispeed).
 - **Rhythm:** 57 patterns played on real recorded drums, with intro, ending and fills.
 - **Audio and MIDI:** audio interface support (device, Mono/Stereo input, output pair and buffer selection), MIDI control, and MIDI clock in and out.
@@ -17,7 +17,8 @@ A native SwiftUI + AVAudioEngine app for macOS 13+ (Apple silicon and Intel). It
 
 | Version | Changes |
 |---|---|
-| **1.9** | **Stereo input:** the Audio tab now has an Input setting, Mono or Stereo. Stereo records a channel pair (Inputs 1 + 2 by default, 3 + 4, … or custom left/right), with separate L/R input meters. **About Looper** now shows the real version, build number and architecture; the build scripts and CI write the version into Info.plist. New **Help** menu: Help & Shortcuts (⌘?), Release Notes, GitHub. |
+| **1.9.1** | **Count-in and Intro now work with the rhythm off**: a one-bar metronome count (accented click on beat 1) before recording. The loop keeps the count tempo and is fitted to whole bars, so turning the rhythm on later stays in time. About Looper shows the real version, and there's a new Help menu. |
+| 1.9 | **Stereo input:** the Audio tab now has an Input setting, Mono or Stereo. Stereo records a channel pair (Inputs 1 + 2 by default, 3 + 4, … or custom left/right), with separate L/R input meters. **About Looper** now shows the real version, build number and architecture; the build scripts and CI write the version into Info.plist. New **Help** menu: Help & Shortcuts (⌘?), Release Notes, GitHub. |
 | 1.8 | Rhythm **intro** (count + fill) and **ending** (fill + final hit), a fill when switching variation A↔B, and **external MIDI clock** sync (tempo, Start/Stop/Continue). Labelled arm64 / x86_64 release builds (CI and `release.sh`). |
 | 1.7 | Output pair selection for multichannel interfaces. |
 | 1.6 | **Real recorded drums** (Karoryfer *Big Rusty Drums*, CC0) with velocity layers and round-robin takes. |
@@ -100,7 +101,7 @@ Running the workflow again for the same version replaces that release's files.
 | Hold pedal = UNDO/REDO, hold when stopped = CLEAR | Same (2 s hold). UNDO/REDO and CLEAR footswitches too. |
 | Overdub / Replace dub mode | Both modes. Replace is also undoable. |
 | Loop quantize | Loop length snaps to whole bars when the rhythm is on. |
-| Auto rec, count-in | Both, with an adjustable auto-rec threshold. |
+| Auto rec, count-in | Both, with an adjustable auto-rec threshold. The count-in plays one bar of the rhythm, or metronome clicks when the rhythm is off. |
 | Start: immediate / fade in · Stop: immediate / fade out / loop end | All of them, with adjustable fade time. A second stop press stops right away. |
 | One shot, reverse | Both. |
 | Tempo: tap / derived from loop, change loop tempo | Tap tempo (**T**). Without rhythm, the tempo is worked out from the loop length. After recording, the tempo stays live: changing it (slider, tap, ±) speeds the loop up or down from 50 % to 200 % and the rhythm follows. **Keep pitch** uses a granular time-stretch; **Varispeed** works like tape, so the pitch follows the speed. You can overdub at any tempo. **Original tempo** returns to the recorded speed. |

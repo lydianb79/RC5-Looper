@@ -116,7 +116,7 @@ struct SetupView: View {
                 }
                 .pickerStyle(.segmented)
                 Toggle("Loop quantize (snap loop to whole bars when rhythm is on)", isOn: $looper.settings.quantize)
-                Toggle("Count-in (one bar of rhythm before recording)", isOn: $looper.settings.countIn)
+                Toggle("Count-in (one bar before recording; metronome clicks when the rhythm is off)", isOn: $looper.settings.countIn)
                 Toggle("Auto rec (recording starts when you play)", isOn: $looper.settings.autoRec)
                 if looper.settings.autoRec {
                     LabeledContent("Auto rec threshold") {

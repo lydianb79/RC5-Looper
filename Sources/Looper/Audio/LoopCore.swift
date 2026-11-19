@@ -88,6 +88,9 @@ final class LoopCore {
     private(set) var currentLayerActive = false
     private(set) var rhythmRunning = false
     private(set) var recordedWithRhythm = false
+    /// The current loop was recorded after a count-in (its tempo is the count tempo).
+    private(set) var recordedWithCount = false
+    private var countingIn = false
     private(set) var inLevel: Float = 0
     private(set) var inLevelL: Float = 0
     private(set) var inLevelR: Float = 0
@@ -217,7 +220,11 @@ final class LoopCore {
         switch c {
         case .armRecording: armRecording()
         case .cancelArm:
-            if state == .armed || state == .autoRecArmed { state = .empty }
+            if state == .armed || state == .autoRecArmed {
+                state = .empty
+                countingIn = false
+                rhythm.cancelSpecial()
+            }
         case .finishRecording(let next): finishRecording(next)
         case .startOverdub:
             if state == .playing && loopLength > 0 && !stopping { beginDub() }
@@ -258,16 +265,23 @@ final class LoopCore {
 
     private func armRecording() {
         guard state == .empty else { return }
-        if rhythmOn {
-            let mf = rhythm.measureFrames
-            if countIn || rhythmIntro {
-                rhythm.reset()
-                rhythm.cancelSpecial()
+        let mf = rhythm.measureFrames
+        if countIn || rhythmIntro {
+            // One bar before recording starts. With the rhythm on: the pattern (or the intro fill);
+            // with the rhythm off: a metronome count (accented click on beat 1).
+            rhythm.reset()
+            rhythm.cancelSpecial()
+            if rhythmOn {
                 if rhythmIntro { rhythm.startIntro() }
-                countdown = Int(mf.rounded())
-                state = .armed
-                return
+            } else {
+                rhythm.startCount()
             }
+            countingIn = true
+            countdown = Int(mf.rounded())
+            state = .armed
+            return
+        }
+        if rhythmOn {
             if quantize {
                 // Rhythm is free running in the empty state: start on the next bar line.
                 let pos = Double(rhythm.frame).truncatingRemainder(dividingBy: mf)
@@ -295,6 +309,8 @@ final class LoopCore {
         tailRemaining = 0
         recComp = latencyFrames
         recordedWithRhythm = rhythmOn
+        recordedWithCount = countingIn
+        countingIn = false
         loopLength = 0
         currentLayer = -1
         currentLayerActive = false
@@ -427,6 +443,8 @@ final class LoopCore {
             finishRecording(.stopped)
         case .armed, .autoRecArmed:
             state = .empty
+            countingIn = false
+            rhythm.cancelSpecial()
         case .playing, .overdubbing:
             if state == .overdubbing { state = .playing }
             if stopping || stopAtWrap || endingPending {             // second stop = stop now
@@ -487,6 +505,7 @@ final class LoopCore {
         loopLength = 0
         loopTempo = 0
         endingPending = false
+        countingIn = false
         rhythm.cancelSpecial()
         playPos = 0
         syncStretch()
@@ -885,7 +904,8 @@ final class LoopCore {
             }
 
             // Rhythm
-            let rActive = rhythmOn && state != .stopped
+            // the rhythm engine also runs for the metronome count-in when the rhythm itself is off
+            let rActive = (rhythmOn && state != .stopped) || (state == .armed && countingIn)
             let rs: (Float, Float) = rActive ? rhythm.tick() : rhythm.tail()
             if rActive { rhythmWasRunning = true }
             if endingPending && rhythm.consumeEndingDone() {

@@ -92,7 +92,7 @@ final class RhythmEngine {
     private var requestedVar = 0
 
     /// Special phrases (RC-5 style intro / ending).
-    enum Mode { case normal, intro, ending, finished }
+    enum Mode { case normal, intro, count, ending, finished }
     private(set) var mode: Mode = .normal
     private var endingArmed = false
     /// Set when the ending's final hit has been played (read by LoopCore).
@@ -151,6 +151,9 @@ final class RhythmEngine {
 
     func startIntro() { mode = .intro }
 
+    /// Metronome count-in (used when the rhythm itself is off).
+    func startCount() { mode = .count }
+
     func requestEnding() {
         guard mode == .normal || mode == .intro else { return }
         mode = .ending
@@ -196,6 +199,11 @@ final class RhythmEngine {
             activeVar = requestedVar
         }
         if mode == .finished { return }
+        if mode == .count {
+            // metronome count: accented click on beat 1, softer clicks on the other beats
+            if idx % spb == 0 { synth.trigger(8, idx == 0 ? 1.0 : 0.62) }
+            return
+        }
         if mode == .ending { endingArmed = true }
         // fills: intro bar, ending bar, and when switching variation A <-> B
         let wantsFill = mode == .ending || mode == .intro || requestedVar != activeVar

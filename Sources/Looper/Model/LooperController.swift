@@ -19,7 +19,7 @@ enum SideTab: String, CaseIterable, Identifiable {
 
 /// Main-thread brain of the app: pedal logic, memories, settings, MIDI, UI snapshot.
 final class LooperController: ObservableObject {
-    static let version = "1.9"
+    static let version = "1.9.1"
     #if arch(arm64)
     static let architecture = "Apple silicon (arm64)"
     #else
@@ -505,7 +505,9 @@ final class LooperController: ObservableObject {
 
         // New loop just recorded → derive tempo / measure count (RC-5 style)
         if L != lastLoopLength {
-            if lastLoopLength == 0 && L > 0 && !loading { newLoopRecorded(length: L, withRhythm: c.recordedWithRhythm) }
+            if lastLoopLength == 0 && L > 0 && !loading {
+                newLoopRecorded(length: L, withRhythm: c.recordedWithRhythm, withCount: c.recordedWithCount)
+            }
             lastLoopLength = L
             needWave = true
         }
@@ -531,10 +533,18 @@ final class LooperController: ObservableObject {
         }
     }
 
-    private func newLoopRecorded(length L: Int, withRhythm: Bool) {
+    private func newLoopRecorded(length L: Int, withRhythm: Bool, withCount: Bool = false) {
         let sr = core.sampleRate
         let p = RhythmLibrary.pattern(settings.rhythmPattern)
-        if withRhythm {
+        let countBar = p.beats * 60.0 / settings.tempo * sr
+        let countBars = max(1, (Double(L) / countBar).rounded())
+        if !withRhythm && withCount && abs(Double(L) - countBars * countBar) < 0.15 * countBar {
+            // Recorded after a metronome count: keep the count tempo, fine-tuned so the loop is exactly N bars.
+            let exact = countBars * p.beats * 60.0 / (Double(L) / sr)
+            settings.loopMeasures = Int(countBars)
+            core.loopTempo = 0
+            settings.tempo = (exact * 10).rounded() / 10
+        } else if withRhythm {
             let mf = p.beats * 60.0 / settings.tempo * sr
             settings.loopMeasures = max(1, Int((Double(L) / mf).rounded()))
         } else {
