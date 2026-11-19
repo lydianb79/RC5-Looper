@@ -1,0 +1,46 @@
+name: Publish locally built apps
+
+# Publishes the apps built on a Mac with build_local.sh as a GitHub release.
+# The zips are pushed to a temporary orphan branch (dist/*.zip); this workflow attaches
+# them to the release v<version> and then deletes that branch.
+on:
+  workflow_dispatch:
+    inputs:
+      assets_branch:
+        description: "Branch that holds dist/Looper-<version>-{arm64,x86_64}.zip"
+        required: true
+        default: release-assets
+      version:
+        description: "Version, e.g. 2.0"
+        required: true
+      notes_file:
+        description: "Release notes file inside the assets branch"
+        default: dist/NOTES.md
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.assets_branch }}
+      - name: Create or update release v${{ inputs.version }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          NOTES: ${{ inputs.notes_file }}
+        run: |
+          TARGET=$(gh api repos/${{ github.repository }}/commits/main -q .sha)
+          if gh release view "v$VERSION" -R ${{ github.repository }} >/dev/null 2>&1; then
+            gh release upload "v$VERSION" dist/*.zip --clobber -R ${{ github.repository }}
+            gh release edit "v$VERSION" --notes-file "$NOTES" --prerelease=false --latest -R ${{ github.repository }}
+          else
+            gh release create "v$VERSION" dist/*.zip --target "$TARGET" --title "Looper $VERSION" --notes-file "$NOTES" --latest -R ${{ github.repository }}
+          fi
+      - name: Remove the temporary assets branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X DELETE repos/${{ github.repository }}/git/refs/heads/${{ inputs.assets_branch }} || true
