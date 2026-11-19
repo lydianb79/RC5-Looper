@@ -80,11 +80,13 @@ struct LooperCommands: Commands {
             Button(looper.showRhythm ? "Hide Rhythm Panel" : "Show Rhythm Panel") { looper.showRhythm.toggle() }
                 .keyboardShortcut("r", modifiers: [.control, .command])
             Divider()
-            Menu("Theme") {
-                ForEach(Array(AppTheme.allCases.enumerated()), id: \.element) { i, t in
-                    Button((looper.appTheme == t ? "✓  " : "     ") + t.label) { looper.appTheme = t }
-                        .keyboardShortcut(KeyEquivalent(Character(String(i + 1))), modifiers: [.control, .command])
-                }
+            // Themes are listed directly in the View menu: SwiftUI submenus in the menu bar
+            // don't respond reliably on every macOS version.
+            Text("Theme")
+            ForEach(AppTheme.allCases) { t in
+                Button((looper.appTheme == t ? "✓  " : "     ") + t.label) { looper.appTheme = t }
+                    .keyboardShortcut(KeyEquivalent(Character(String((AppTheme.allCases.firstIndex(of: t) ?? 0) + 1))),
+                                      modifiers: [.control, .command])
             }
             Divider()
         }

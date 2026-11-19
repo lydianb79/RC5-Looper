@@ -19,7 +19,7 @@ enum SideTab: String, CaseIterable, Identifiable {
 
 /// Main-thread brain of the app: pedal logic, memories, settings, MIDI, UI snapshot.
 final class LooperController: ObservableObject {
-    static let version = "2.0-beta.7"
+    static let version = "2.0-beta.8"
     #if arch(arm64)
     static let architecture = "Apple silicon (arm64)"
     #else
