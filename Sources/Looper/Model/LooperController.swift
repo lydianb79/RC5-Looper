@@ -51,6 +51,11 @@ final class LooperController: ObservableObject {
     @Published var showRhythm: Bool = UserDefaults.standard.object(forKey: "showRhythm") as? Bool ?? true {
         didSet { UserDefaults.standard.set(showRhythm, forKey: "showRhythm") }
     }
+    /// Tracks 2 and 3: waveforms and mutes. Track 1 mute and the global "drop" mute.
+    @Published var trackWaves: [[Float]] = [[], []]
+    @Published var trackMuted: [Bool] = [false, false] { didSet { core.sub1.muted = trackMuted[0]; core.sub2.muted = trackMuted[1] } }
+    @Published var mainMuted = false { didSet { core.mainMuted = mainMuted } }
+    @Published var allMuted = false { didSet { core.allMuted = allMuted } }
     /// Pattern editor: grid cells become clickable.
     @Published var editingPattern = false
     /// Bumped whenever a user pattern changes (refreshes the grid and menus).
@@ -308,6 +313,21 @@ final class LooperController: ObservableObject {
         c.fixedNext = settings.recAction == .recDubPlay && !settings.oneShot ? .overdubbing : .playing
         c.stretchMode = settings.stretchMode
         c.tempo = settings.tempo
+        c.trackDubAfterRecord = settings.recAction == .recDubPlay
+        c.sub1.level = Float(settings.trackLevels.first ?? 1)
+        c.sub2.level = Float(settings.trackLevels.count > 1 ? settings.trackLevels[1] : 1)
+        c.sub1.replaceMode = settings.dubMode == .replace
+        c.sub2.replaceMode = settings.dubMode == .replace
+        Self.apply(settings.inputFX, to: c.inputFX)
+        Self.apply(settings.loopFX, to: c.loopFX)
+    }
+
+    static func apply(_ f: FXSettings, to u: FXUnit) {
+        u.type = f.type
+        u.a = Float(f.a)
+        u.b = Float(f.b)
+        u.delayBeats = f.time.beats
+        u.on = f.on
     }
 
     private func applyGlobals() {
@@ -494,10 +514,26 @@ final class LooperController: ObservableObject {
         s.loopSeconds = Double(L) / sr
         s.recordSeconds = Double(c.recordPos) / sr
         if L > 0 { s.position = Double(min(c.playPos, L)) / Double(L) }
-        s.canUndo = c.currentLayer >= 0 && c.currentLayerActive
-        s.canRedo = c.currentLayer >= 0 && !c.currentLayerActive
-        s.hasDubLayer = c.currentLayer >= 0
-        s.dubActive = c.currentLayerActive
+        s.canUndo = c.undoDepth > 0
+        s.canRedo = c.redoDepth > 0
+        s.hasDubLayer = c.stack.hasLayers
+        s.dubActive = c.undoDepth > 0
+        s.undoDepth = c.undoDepth
+        s.redoDepth = c.redoDepth
+        s.doubling = c.stack.doubling
+        s.swapPending = c.swapPending
+        for t in 0..<2 {
+            let tr = c.sub(t)
+            var ts = TrackSnapshot()
+            ts.state = tr.state.rawValue
+            ts.cycles = tr.cycles
+            ts.seconds = Double(tr.length) / sr
+            ts.recordProgress = tr.recordedCycles(mainLength: L)
+            ts.stopRequested = tr.stopRequested
+            ts.undoDepth = tr.stack.undoDepth
+            ts.redoDepth = tr.stack.redoDepth
+            s.tracks[t] = ts
+        }
         s.inLevel = c.inLevel
         s.inLevelL = c.inLevelL
         s.inLevelR = c.inLevelR
@@ -551,7 +587,7 @@ final class LooperController: ObservableObject {
             if !loading { dirty = L > 0 || s.state == .recording }
         }
         tickCount += 1
-        let live = s.state == .recording || s.state == .overdubbing
+        let live = s.state == .recording || s.state == .overdubbing || s.tracks.contains { $0.state == 1 || $0.state == 3 }
         if (needWave && tickCount % 3 == 0) || (live && tickCount % 6 == 0) {
             needWave = false
             updateWaveform()
@@ -610,6 +646,7 @@ final class LooperController: ObservableObject {
         }
         let bins = 240
         guard len > 0 else {
+            if !trackWaves[0].isEmpty || !trackWaves[1].isEmpty { trackWaves = [[], []] }
             if !waveform.isEmpty { waveform = [] }
             if !baseWave.isEmpty { baseWave = [] }
             if !dubWave.isEmpty { dubWave = [] }
@@ -640,7 +677,8 @@ final class LooperController: ObservableObject {
         }
         waveform = out
         baseWave = base
-        dubWave = c.currentLayer >= 0 ? dub : []
+        dubWave = c.stack.hasLayers ? dub : []
+        updateTrackWaves()
     }
 
     static func thumbnail(from wave: [Float], count: Int) -> [Float] {

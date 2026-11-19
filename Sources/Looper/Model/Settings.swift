@@ -86,6 +86,9 @@ struct MemorySettings: Codable, Equatable {
     var loopTempo = 0.0          // tempo the loop audio was recorded at (0 = same as tempo)
     var stretchMode = StretchMode.keepPitch
     var loopMeasures = 0
+    var trackLevels: [Double] = [1, 1]   // tracks 2 and 3
+    var inputFX = FXSettings()
+    var loopFX = FXSettings()
     var countInBars = 1          // 1 or 2 bars
     var clickMode = 0            // rhythm off: 0 click only for the count-in, 1 also while recording, 2 always
     var loopLength = 0           // fixed loop length in bars (0 = none: you close the loop yourself)
@@ -95,7 +98,7 @@ struct MemorySettings: Codable, Equatable {
     enum CodingKeys: String, CodingKey {
         case name, recAction, dubMode, quantize, autoRec, countIn, startMode, stopMode, fadeSeconds
         case thumb, oneShot, reverse, loopLevel, rhythmOn, rhythmPattern, rhythmVariation, rhythmKit
-        case rhythmLevel, rhythmReverb, rhythmHumanize, rhythmIntro, rhythmEnding, tempo, loopTempo, stretchMode, loopMeasures, loopLength, countInBars, clickMode, savedSeconds
+        case rhythmLevel, rhythmReverb, rhythmHumanize, rhythmIntro, rhythmEnding, tempo, loopTempo, stretchMode, loopMeasures, loopLength, trackLevels, inputFX, loopFX, countInBars, clickMode, savedSeconds
     }
 
     static func defaults(for slot: Int) -> MemorySettings {
@@ -140,6 +143,10 @@ extension MemorySettings {
         loopMeasures = v(.loopMeasures, loopMeasures)
         loopLength = v(.loopLength, loopLength)
         countInBars = v(.countInBars, countInBars)
+        trackLevels = v(.trackLevels, trackLevels)
+        if trackLevels.count < 2 { trackLevels += Array(repeating: 1, count: 2 - trackLevels.count) }
+        inputFX = v(.inputFX, inputFX)
+        loopFX = v(.loopFX, loopFX)
         clickMode = v(.clickMode, clickMode)
         savedSeconds = v(.savedSeconds, savedSeconds)
         thumb = v(.thumb, thumb)
@@ -173,6 +180,22 @@ struct Snapshot: Equatable {
     var hasDubLayer = false       // an undoable overdub layer exists
     var dubActive = false         // …and is audible (not undone)
     var rhythmStep = -1           // current step of the rhythm grid, -1 = not running
+    var undoDepth = 0
+    var redoDepth = 0
+    var doubling = false
+    var swapPending = false
+    var tracks: [TrackSnapshot] = [TrackSnapshot(), TrackSnapshot()]
+}
+
+/// UI state of tracks 2 and 3.
+struct TrackSnapshot: Equatable {
+    var state = 0                 // SubTrack.State raw value: 0 empty, 1 recording, 2 playing, 3 overdubbing
+    var cycles = 0
+    var seconds: Double = 0
+    var recordProgress: Double = 0
+    var stopRequested = false
+    var undoDepth = 0
+    var redoDepth = 0
 }
 
 struct MemoryInfo: Identifiable, Equatable {

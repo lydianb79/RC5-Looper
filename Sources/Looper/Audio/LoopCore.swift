@@ -18,29 +18,49 @@ enum LoopCommand {
     case resetRhythm
     case rhythmStart     // play the rhythm on its own (no loop yet)
     case rhythmStop
+    case undo
+    case redo
+    case doubleLoop
+    case fadeOut
+    case trackPress(Int)             // extra tracks 1…2 (tracks 2 and 3 in the UI)
+    case trackUndo(Int)
+    case trackRedo(Int)
+    case trackClear(Int)
+    case trackStopDub(Int)
+    case trackSetLoaded(Int, length: Int)
+    case armSwap(SwapInfo)
+    case cancelSwap
+}
+
+/// A preloaded memory that replaces the current one at the next loop point (song mode).
+struct SwapInfo {
+    var length = 0
+    var trackLengths: (Int, Int) = (0, 0)
+    var loopTempo: Double = 0
+    var tempo: Double = 120
+    var pattern = 0
+    var variation = 0
+    var kit = 0
+    var rhythmOn = false
 }
 
 /// The realtime looper engine.
 ///
-/// Audio layout: the loop is `base + layerA + layerB`.
-/// * The first recording is written into `base`.
-/// * Each overdub goes into its own layer, so the latest overdub can be
-///   undone / redone by muting the layer (like the RC-5's UNDO/REDO).
-/// * When a new overdub starts, the previous layer is merged into `base`
-///   incrementally on the audio thread (a few hundred thousand samples per
-///   callback) so no large copy ever blocks the audio thread.
-/// * Replace mode stores `input - (base + other)` in the layer, so even
-///   replacing is undoable.
+/// * Track 1 (the main loop) lives in `stack` (base recording + undoable overdub layers,
+///   see LayerStack). Tracks 2 and 3 (`sub1`, `sub2`) are synced to it (see SubTrack).
+/// * Input FX process the input before it is recorded; loop FX process the loop playback.
 final class LoopCore {
     let sampleRate: Double
     let capacity: Int
 
-    let baseL: UnsafeMutablePointer<Float>
-    let baseR: UnsafeMutablePointer<Float>
-    private let layAL: UnsafeMutablePointer<Float>
-    private let layAR: UnsafeMutablePointer<Float>
-    private let layBL: UnsafeMutablePointer<Float>
-    private let layBR: UnsafeMutablePointer<Float>
+    let stack: LayerStack
+    let sub1: SubTrack
+    let sub2: SubTrack
+    let inputFX: FXUnit
+    let loopFX: FXUnit
+    var baseL: UnsafeMutablePointer<Float> { stack.baseL }
+    var baseR: UnsafeMutablePointer<Float> { stack.baseR }
+    func sub(_ t: Int) -> SubTrack { t == 0 ? sub1 : sub2 }
 
     let rhythm: RhythmEngine
 
@@ -83,6 +103,11 @@ final class LoopCore {
     /// Tempo the loop was recorded at. Playback rate = tempo / loopTempo (RC-5 style live tempo).
     var loopTempo: Double = 0
     var stretchMode: StretchMode = .keepPitch
+    /// Track 1 mute and the global loop mute ("drop").
+    var mainMuted = false
+    var allMuted = false
+    /// What follows a recording on tracks 2 / 3.
+    var trackDubAfterRecord = false
 
     // MARK: Published state (written by the audio thread)
     private(set) var state: LoopState = .empty
@@ -97,8 +122,15 @@ final class LoopCore {
     private(set) var endingPending = false
     /// The rhythm plays on its own while no loop exists (started with Space / Play, stopped with Space / Stop).
     private(set) var rhythmPreview = false
-    private(set) var currentLayer = -1
-    private(set) var currentLayerActive = false
+    /// Main-loop cycle counter (+1 per forward wrap, -1 per reverse wrap): keeps tracks 2 / 3 in sync.
+    private(set) var masterCycle = 0
+    /// Number of loop wraps since play started (song mode counts repeats with it).
+    private(set) var wrapCount = 0
+    private(set) var swapGeneration = 0
+    private var pendingSwap: SwapInfo?
+    var swapPending: Bool { pendingSwap != nil }
+    var undoDepth: Int { stack.undoDepth }
+    var redoDepth: Int { stack.redoDepth }
     private(set) var rhythmRunning = false
     private(set) var recordedWithRhythm = false
     /// The current loop was recorded after a count-in (its tempo is the count tempo).
@@ -119,16 +151,10 @@ final class LoopCore {
     private var gain: Float = 1
     private var gainTarget: Float = 1
     private var gainStep: Float = 0.001
-    private var g0: Float = 0
-    private var g1: Float = 0
-    private var dubPrevLayer = -1
-    private var dubPrevActive = false
     private var jobDelay = 0
-    private let jobActive: UnsafeMutablePointer<Int>
-    private let jobMerge: UnsafeMutablePointer<Int>
-    private let jobCursor: UnsafeMutablePointer<Int>
-    private let jobEnd: UnsafeMutablePointer<Int>
-    private let usedLen: UnsafeMutablePointer<Int>
+    private var mainGain: Float = 1
+    private var allGain: Float = 1
+    private var muteStep: Float = 0.001
 
     // Time-stretch state (granular overlap-add, Hann windows at 50 % overlap)
     private let grainHop: Int
@@ -178,9 +204,12 @@ final class LoopCore {
         func buffer(_ n: Int) -> UnsafeMutablePointer<Float> {
             calloc(n, MemoryLayout<Float>.size)!.assumingMemoryBound(to: Float.self)
         }
-        baseL = buffer(cap); baseR = buffer(cap)
-        layAL = buffer(cap); layAR = buffer(cap)
-        layBL = buffer(cap); layBR = buffer(cap)
+        stack = LayerStack(capacity: cap)
+        sub1 = SubTrack(capacity: cap, sampleRate: sampleRate)
+        sub2 = SubTrack(capacity: cap, sampleRate: sampleRate)
+        inputFX = FXUnit(sampleRate: sampleRate)
+        loopFX = FXUnit(sampleRate: sampleRate)
+        muteStep = Float(1.0 / (0.012 * sampleRate))
         ringL = buffer(1 << 15); ringR = buffer(1 << 15)
         ringMask = (1 << 15) - 1
         func ints(_ count: Int = 2) -> UnsafeMutablePointer<Int> {
@@ -188,7 +217,6 @@ final class LoopCore {
             p.initialize(repeating: 0, count: count)
             return p
         }
-        jobActive = ints(); jobMerge = ints(); jobCursor = ints(); jobEnd = ints(); usedLen = ints()
         let hop = max(256, Int(0.021 * sampleRate))
         grainHop = hop
         grainLen = hop * 2
@@ -251,12 +279,42 @@ final class LoopCore {
                 if state == .stopped { startPlay() }
                 else if state == .playing || state == .overdubbing {
                     playPos = reverse ? loopLength - 1 : 0
+                    masterCycle = 0
                     syncStretch()
                     rhythm.reset()
                 }
             }
         case .stop: requestStop()
         case .toggleUndo: toggleUndo()
+        case .undo:
+            if state == .overdubbing { state = .playing }
+            stack.undo()
+            loopGeneration &+= 1
+        case .redo:
+            stack.redo()
+            loopGeneration &+= 1
+        case .doubleLoop: doubleLoop()
+        case .fadeOut:
+            if state == .playing || state == .overdubbing {
+                if state == .overdubbing { state = .playing }
+                stopping = true
+                gainTarget = 0
+                gainStep = Float(1.0 / (max(0.05, fadeSeconds) * sampleRate))
+            }
+        case .trackPress(let t):
+            guard loopLength > 0, !reverse else { break }
+            if state == .stopped { startPlay() }
+            guard state == .playing || state == .overdubbing else { break }
+            sub(t).press(cycle: masterCycle, position: playPos, mainLength: loopLength, dubAfterRecord: trackDubAfterRecord)
+        case .trackUndo(let t): sub(t).undo()
+        case .trackRedo(let t): sub(t).redo()
+        case .trackClear(let t): sub(t).clear()
+        case .trackStopDub(let t): sub(t).stopOverdub()
+        case .trackSetLoaded(let t, let len): sub(t).setLoaded(length: len, mainLength: loopLength)
+        case .armSwap(let info):
+            pendingSwap = info
+            if state != .playing && state != .overdubbing { applySwap() }
+        case .cancelSwap: pendingSwap = nil
         case .clear: clearAll()
         case .resetRhythm: rhythm.reset()
         case .rhythmStart:
@@ -272,11 +330,10 @@ final class LoopCore {
                 loopLength = max(0, min(len, capacity))
                 state = loopLength > 0 ? .stopped : .empty
                 playPos = 0
+                masterCycle = 0
                 syncStretch()
-                currentLayer = -1
-                currentLayerActive = false
+                stack.clearAll()
                 tailRemaining = 0
-                updateGains()
                 loopGeneration &+= 1
             }
         }
@@ -333,11 +390,9 @@ final class LoopCore {
         recordedWithCount = countingIn || (clickMode > 0 && !rhythmOn)
         countingIn = false
         loopLength = 0
-        currentLayer = -1
-        currentLayerActive = false
+        stack.clearAll()
         stopping = false
         stopAtWrap = false
-        updateGains()
         rhythm.reset()
         rhythm.cancelSpecial()
         if fixedBars > 0 {
@@ -381,6 +436,8 @@ final class LoopCore {
         tailRemaining = max(0, L - tailNext)
         pendingEnd = 0
         playPos = reverse ? L - 1 : 0
+        masterCycle = 0
+        wrapCount = 0
         loopTempo = tempo
         syncStretch()
         state = .playing
@@ -398,52 +455,81 @@ final class LoopCore {
     }
 
     private func beginDub() {
-        let L = loopLength
-        dubPrevLayer = currentLayer
-        dubPrevActive = currentLayerActive
-        if currentLayer >= 0 {
-            // Commit (or throw away, if it was undone) the previous overdub.
-            scheduleJob(currentLayer, merge: currentLayerActive, end: L)
-        }
-        let next = currentLayer == 0 ? 1 : 0
-        if jobActive[next] != 0 { finishJob(next) }
-        currentLayer = next
-        currentLayerActive = true
-        usedLen[next] = L
+        guard stack.beginDub(length: loopLength) else { return }
         writerReset = true
         // Grace period: lets a double-press / long-press cancel this dub
-        // before the previous layer is committed.
+        // before older layers are committed.
         jobDelay = Int(2.5 * sampleRate)
         state = .overdubbing
-        updateGains()
         loopGeneration &+= 1
     }
 
     private func abortDub() {
         guard state == .overdubbing else { return }
-        let prev = dubPrevLayer
-        let prevUntouched = prev < 0 || (jobActive[prev] != 0 && jobCursor[prev] == 0)
-        if jobDelay > 0 && prevUntouched {
-            if prev >= 0 { jobActive[prev] = 0 }
-            let newLayer = currentLayer
-            currentLayer = prev
-            currentLayerActive = dubPrevActive
-            if newLayer >= 0 { scheduleJob(newLayer, merge: false, end: loopLength) }
-        }
+        if jobDelay > 0 { _ = stack.abortDub() }
         state = .playing
-        updateGains()
         loopGeneration &+= 1
     }
 
     private func toggleUndo() {
-        guard currentLayer >= 0 && loopLength > 0 else { return }
+        guard stack.hasLayers && loopLength > 0 else { return }
         if state == .overdubbing {
             state = .playing
-            currentLayerActive = false
+            stack.undo()
         } else {
-            currentLayerActive.toggle()
+            stack.toggleUndo()
         }
-        updateGains()
+        loopGeneration &+= 1
+    }
+
+    /// ×2: the loop is copied behind itself; tracks 2 / 3 follow.
+    private func doubleLoop() {
+        let L = loopLength
+        guard L > 0, L * 2 <= capacity, tailRemaining == 0, state != .recording, !stack.doubling else { return }
+        if state == .overdubbing { state = .playing }
+        guard stack.startDouble(length: L) else { return }
+        sub1.mainDoubled(oldMainLength: L)
+        sub2.mainDoubled(oldMainLength: L)
+        let odd = ((masterCycle % 2) + 2) % 2 == 1
+        if odd {
+            playPos += L
+            vPos += Double(L)
+        }
+        masterCycle = Int((Double(masterCycle) / 2).rounded(.down))
+        loopLength = L * 2
+        needStretchInit = true
+        loopGeneration &+= 1
+    }
+
+    /// Swaps in a preloaded memory (song mode). Called at a loop point or while stopped.
+    private func applySwap() {
+        guard let info = pendingSwap else { return }
+        pendingSwap = nil
+        stack.swapPreloaded()
+        loopLength = max(0, min(info.length, capacity))
+        loopTempo = info.loopTempo
+        tempo = info.tempo
+        patternIndex = info.pattern
+        variation = info.variation
+        kitIndex = info.kit
+        rhythmOn = info.rhythmOn
+        playPos = reverse ? max(0, loopLength - 1) : 0
+        masterCycle = 0
+        wrapCount = 0
+        syncStretch()
+        let lens = [info.trackLengths.0, info.trackLengths.1]
+        for t in 0..<2 {
+            let tr = sub(t)
+            if lens[t] > 0 {
+                tr.stack.swapPreloaded()
+                tr.setLoaded(length: lens[t], mainLength: loopLength)
+            } else {
+                tr.clear()
+            }
+        }
+        if loopLength == 0 { state = .empty }
+        rhythm.reset()
+        swapGeneration &+= 1
         loopGeneration &+= 1
     }
 
@@ -452,6 +538,8 @@ final class LoopCore {
         stopping = false
         stopAtWrap = false
         playPos = reverse ? loopLength - 1 : 0
+        masterCycle = 0
+        wrapCount = 0
         syncStretch()
         gain = 0
         gainTarget = 1
@@ -466,6 +554,8 @@ final class LoopCore {
         switch state {
         case .recording:
             finishRecording(.stopped)
+        case .stopped:
+            pendingSwap = nil
         case .armed, .autoRecArmed:
             state = .empty
             countingIn = false
@@ -504,6 +594,10 @@ final class LoopCore {
     }
 
     private func enterStopped() {
+        sub1.mainStopped(mainLength: loopLength)
+        sub2.mainStopped(mainLength: loopLength)
+        if pendingSwap != nil { applySwap() }
+        masterCycle = 0
         endingPending = false
         rhythmPreview = false
         state = .stopped
@@ -516,20 +610,12 @@ final class LoopCore {
     }
 
     private func clearAll() {
-        for li in 0..<2 {
-            if jobActive[li] != 0 {
-                jobMerge[li] = 0
-                jobEnd[li] = max(jobEnd[li], usedLen[li])
-            } else if usedLen[li] > 0 {
-                jobActive[li] = 1
-                jobMerge[li] = 0
-                jobCursor[li] = 0
-                jobEnd[li] = usedLen[li]
-            }
-        }
+        stack.clearAll()
+        sub1.clear()
+        sub2.clear()
+        pendingSwap = nil
+        masterCycle = 0
         jobDelay = 0
-        currentLayer = -1
-        currentLayerActive = false
         state = .empty
         loopLength = 0
         loopTempo = 0
@@ -546,7 +632,6 @@ final class LoopCore {
         stopAtWrap = false
         gain = 1
         gainTarget = 1
-        updateGains()
         loopGeneration &+= 1
     }
 
@@ -556,6 +641,14 @@ final class LoopCore {
     }
 
     private func onWrap() {
+        masterCycle += reverse ? -1 : 1
+        wrapCount &+= 1
+        sub1.mainWrapped(cycle: masterCycle, mainLength: loopLength)
+        sub2.mainWrapped(cycle: masterCycle, mainLength: loopLength)
+        if pendingSwap != nil {
+            applySwap()
+            return
+        }
         rhythm.reset()
         if oneShot || stopAtWrap { enterStopped() }
     }
@@ -568,12 +661,42 @@ final class LoopCore {
 
     // MARK: Playback paths
 
-    @inline(__always) private func mix(_ i: Int) -> (Float, Float) {
-        var l = baseL[i]
-        var r = baseR[i]
-        if g0 != 0 { l += layAL[i]; r += layAR[i] }
-        if g1 != 0 { l += layBL[i]; r += layBR[i] }
+    /// Main cycle that main-loop index `i` belongs to (grains may straddle the loop point).
+    @inline(__always) private func cycleOf(_ i: Int, _ L: Int) -> Int {
+        let h = playPos
+        if i - h > L / 2 { return masterCycle - 1 }
+        if h - i > L / 2 { return masterCycle + 1 }
+        return masterCycle
+    }
+
+    /// All tracks at main-loop index `i` (track levels and mutes applied).
+    @inline(__always) private func mix(_ i: Int, main: Bool = true) -> (Float, Float) {
+        var l: Float = 0
+        var r: Float = 0
+        if main {
+            let m = stack.mix(i)
+            l = m.0 * mainGain
+            r = m.1 * mainGain
+        }
+        let L = loopLength
+        if sub1.hasContent || sub2.hasContent {
+            let c = cycleOf(i, L)
+            let a = sub1.read(cycle: c, index: i, mainLength: L)
+            let b = sub2.read(cycle: c, index: i, mainLength: L)
+            l += a.0 + b.0
+            r += a.1 + b.1
+        }
         return (l, r)
+    }
+
+    /// Input for tracks 2 / 3 (they record and overdub while the main loop plays).
+    @inline(__always) private func writeSubs(_ w: Int, _ L: Int, _ inL: Float, _ inR: Float, stretched: Bool) {
+        let s1 = sub1.state == .recording || sub1.state == .overdubbing
+        let s2 = sub2.state == .recording || sub2.state == .overdubbing
+        guard s1 || s2 else { return }
+        let c = cycleOf(w, L)
+        if s1 { sub1.write(cycle: c, index: w, mainLength: L, inL, inR, fillGaps: stretched) }
+        if s2 { sub2.write(cycle: c, index: w, mainLength: L, inL, inR, fillGaps: stretched) }
     }
 
     @inline(__always) private func wrapIndex(_ x: Int, _ L: Int) -> Int {
@@ -585,13 +708,14 @@ final class LoopCore {
     /// Original-tempo playback (sample exact).
     @inline(__always) private func renderDirect(_ L: Int, _ st: LoopState, _ inL: Float, _ inR: Float) -> (Float, Float) {
         let p = min(max(0, playPos), L - 1)
-        var s = mix(p)
-        if st == .overdubbing && dubMode == .replace && !stopping { s = (0, 0) }
-        if st == .overdubbing && !stopping && tailRemaining == 0 {
+        let replacing = st == .overdubbing && dubMode == .replace && !stopping
+        let s = mix(p, main: !replacing)
+        if tailRemaining == 0 && !stopping {
             let comp = min(latencyFrames, L / 2)
             var w = reverse ? p + comp : p - comp
             if w >= L { w -= L } else if w < 0 { w += L }
-            writeDub(w, inL, inR)
+            if st == .overdubbing { stack.write(w, inL, inR, replace: dubMode == .replace) }
+            writeSubs(w, L, inL, inR, stretched: false)
         }
         if reverse {
             playPos = p - 1
@@ -652,11 +776,19 @@ final class LoopCore {
             sR = a.1 + (b.1 - a.1) * f
         }
         if st == .overdubbing && dubMode == .replace && !stopping {
+            // replace mode: only the other tracks keep sounding
             sL = 0
             sR = 0
+            if sub1.hasContent || sub2.hasContent {
+                let m = mix(min(L - 1, max(0, Int(vPos))), main: false)
+                sL = m.0
+                sR = m.1
+            }
         }
-        if st == .overdubbing && !stopping && tailRemaining == 0 {
-            stretchedWrite(L, rate, dir, inL, inR)
+        if !stopping && tailRemaining == 0 {
+            if st == .overdubbing { stretchedWrite(L, rate, dir, inL, inR) }
+            let comp = Double(min(latencyFrames, L / 2))
+            writeSubs(wrapIndex(Int((vPos - Double(dir) * rate * comp).rounded(.down)), L), L, inL, inR, stretched: true)
         }
         vPos += Double(dir) * rate
         var wrapped = false
@@ -703,103 +835,30 @@ final class LoopCore {
                 let idx = wrapIndex(wgStart[g] + dir * j, L)
                 let w = window[j]
                 if dubMode == .overdub {
-                    writeDub(idx, inL * w, inR * w)
+                    stack.write(idx, inL * w, inR * w, replace: false)
                 } else if w >= 0.5 {
-                    writeDub(idx, inL, inR)
+                    stack.write(idx, inL, inR, replace: true)
                 }
                 if j + 1 >= G { wgOn[g] = 0 } else { wgJ[g] = j + 1 }
             }
         } else {
             let target = wrapIndex(Int((vPos - Double(dir) * rate * comp).rounded(.down)), L)
             if vLastWrite < 0 {
-                writeDub(target, inL, inR)
+                stack.write(target, inL, inR, replace: dubMode == .replace)
             } else {
                 var d = (target - vLastWrite) * dir
                 if d < 0 { d += L }
                 if d > 16 {
-                    writeDub(target, inL, inR)
+                    stack.write(target, inL, inR, replace: dubMode == .replace)
                 } else {
                     var k = 1
                     while k <= d {
-                        writeDub(wrapIndex(vLastWrite + dir * k, L), inL, inR)
+                        stack.write(wrapIndex(vLastWrite + dir * k, L), inL, inR, replace: dubMode == .replace)
                         k += 1
                     }
                 }
             }
             vLastWrite = target
-        }
-    }
-
-    // MARK: Layer jobs
-
-    private func updateGains() {
-        g0 = ((currentLayer == 0 && currentLayerActive) || (jobActive[0] != 0 && jobMerge[0] != 0)) ? 1 : 0
-        g1 = ((currentLayer == 1 && currentLayerActive) || (jobActive[1] != 0 && jobMerge[1] != 0)) ? 1 : 0
-    }
-
-    private func scheduleJob(_ li: Int, merge: Bool, end: Int) {
-        if jobActive[li] != 0 { finishJob(li) }
-        jobActive[li] = 1
-        jobMerge[li] = merge ? 1 : 0
-        jobCursor[li] = 0
-        jobEnd[li] = end
-        updateGains()
-    }
-
-    @discardableResult
-    private func runJob(_ li: Int, budget: Int) -> Int {
-        let start = jobCursor[li]
-        let end = min(jobEnd[li], start + budget)
-        let l = li == 0 ? layAL : layBL
-        let r = li == 0 ? layAR : layBR
-        var j = start
-        if jobMerge[li] != 0 {
-            while j < end {
-                baseL[j] += l[j]
-                baseR[j] += r[j]
-                l[j] = 0
-                r[j] = 0
-                j += 1
-            }
-        } else {
-            while j < end {
-                l[j] = 0
-                r[j] = 0
-                j += 1
-            }
-        }
-        jobCursor[li] = end
-        if end >= jobEnd[li] {
-            jobActive[li] = 0
-            usedLen[li] = 0
-            updateGains()
-        }
-        return end - start
-    }
-
-    private func finishJob(_ li: Int) {
-        while jobActive[li] != 0 { runJob(li, budget: Int.max / 4) }
-    }
-
-    private func processJobs(budget: Int) {
-        var b = budget
-        for li in 0..<2 where jobActive[li] != 0 && b > 0 {
-            b -= runJob(li, budget: b)
-        }
-    }
-
-    @inline(__always) private func writeDub(_ w: Int, _ xl: Float, _ xr: Float) {
-        let cl = currentLayer == 0 ? layAL : layBL
-        let cr = currentLayer == 0 ? layAR : layBR
-        if dubMode == .overdub {
-            cl[w] += xl
-            cr[w] += xr
-        } else {
-            let og: Float = currentLayer == 0 ? g1 : g0
-            let ol = currentLayer == 0 ? layBL : layAL
-            let orr = currentLayer == 0 ? layBR : layAR
-            cl[w] = xl - (baseL[w] + og * ol[w])
-            cr[w] = xr - (baseR[w] + og * orr[w])
         }
     }
 
@@ -843,9 +902,14 @@ final class LoopCore {
         }
         if jobDelay > 0 {
             jobDelay -= n
-        } else if jobActive[0] != 0 || jobActive[1] != 0 {
-            processJobs(budget: 1 << 17)
+            if stack.doubling { stack.processJobs(budget: 1 << 17) }
+        } else if stack.hasJobs {
+            stack.processJobs(budget: 1 << 17)
         }
+        if sub1.stack.hasJobs { sub1.stack.processJobs(budget: 1 << 16) }
+        if sub2.stack.hasJobs { sub2.stack.processJobs(budget: 1 << 16) }
+        inputFX.tempo = tempo
+        loopFX.tempo = tempo
         rhythm.configure(tempo: tempo, pattern: patternIndex, variation: variation, kit: kitIndex, reverb: reverbLevel, humanize: humanize)
         if !rhythmOn && rhythmPreview { rhythmPreview = false }
 
@@ -863,6 +927,8 @@ final class LoopCore {
 
         let lvl = loopLevel
         let rl = rhythmLevel
+        let mainTarget: Float = mainMuted ? 0 : 1
+        let allTarget: Float = allMuted ? 0 : 1
         let mon = inputMonitor
         var inPk: Float = 0
         var inPkL: Float = 0
@@ -878,6 +944,19 @@ final class LoopCore {
                 inR = ringR[ringRead & ringMask]
                 ringRead += 1
             }
+            if inputFX.on || inputFX.type == .tapeStop {
+                let fx = inputFX.process(inL, inR)
+                inL = fx.0
+                inR = fx.1
+            }
+            // track gains (smoothed mutes)
+            if mainGain != mainTarget * lvl {
+                let t = mainTarget * lvl
+                mainGain = mainGain < t ? min(t, mainGain + muteStep) : max(t, mainGain - muteStep)
+            }
+            if allGain != allTarget { allGain = allGain < allTarget ? min(allTarget, allGain + muteStep) : max(allTarget, allGain - muteStep) }
+            sub1.tickGain()
+            sub2.tickGain()
             let aL = abs(inL)
             let aR = abs(inR)
             if aL > inPkL { inPkL = aL }
@@ -956,8 +1035,13 @@ final class LoopCore {
             var rg: Float = (state == .playing || state == .overdubbing) ? gain : 1
             if click { rg *= 0.55 }
 
-            var oL = lpL * lvl + rs.0 * rl * rg
-            var oR = lpR * lvl + rs.1 * rl * rg
+            var lfL = lpL * allGain
+            var lfR = lpR * allGain
+            let fx = loopFX.process(lfL, lfR)
+            lfL = fx.0
+            lfR = fx.1
+            var oL = lfL + rs.0 * rl * rg
+            var oR = lfR + rs.1 * rl * rg
             if mon {
                 oL += inL
                 oR += inR
@@ -979,48 +1063,14 @@ final class LoopCore {
     // MARK: Read access for UI / file export (main or background thread)
 
     func readMix(start: Int, count: Int, left: UnsafeMutablePointer<Float>, right: UnsafeMutablePointer<Float>) {
-        let a0 = g0
-        let a1 = g1
-        var i = 0
-        while i < count {
-            let j = start + i
-            if j < capacity {
-                left[i] = baseL[j] + a0 * layAL[j] + a1 * layBL[j]
-                right[i] = baseR[j] + a0 * layAR[j] + a1 * layBR[j]
-            } else {
-                left[i] = 0
-                right[i] = 0
-            }
-            i += 1
-        }
+        stack.readMix(start: start, count: count, left: left, right: right)
     }
 
-    /// Peaks for the two timeline lanes: committed audio (base + layers being merged)
-    /// and the current, undoable overdub layer (shown even while undone).
-    func lanePeaks(at j: Int) -> (base: Float, dub: Float) {
-        guard j >= 0 && j < capacity else { return (0, 0) }
-        var l = baseL[j]
-        var r = baseR[j]
-        var dl: Float = 0
-        var dr: Float = 0
-        for li in 0..<2 {
-            let lp = li == 0 ? layAL : layBL
-            let rp = li == 0 ? layAR : layBR
-            if li == currentLayer {
-                dl += lp[j]
-                dr += rp[j]
-            } else if jobActive[li] != 0 && jobMerge[li] != 0 {
-                l += lp[j]
-                r += rp[j]
-            }
-        }
-        return (max(abs(l), abs(r)), max(abs(dl), abs(dr)))
-    }
+    func lanePeaks(at j: Int) -> (base: Float, dub: Float) { stack.lanePeaks(at: j) }
 
     @inline(__always) func peak(at j: Int) -> Float {
         guard j >= 0 && j < capacity else { return 0 }
-        let l = baseL[j] + g0 * layAL[j] + g1 * layBL[j]
-        let r = baseR[j] + g0 * layAR[j] + g1 * layBR[j]
-        return max(abs(l), abs(r))
+        let m = stack.mix(j)
+        return max(abs(m.0), abs(m.1))
     }
 }
