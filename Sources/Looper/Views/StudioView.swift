@@ -192,6 +192,19 @@ private struct StudioHeader: View {
                 PillToggle(title: "Count-in", symbol: nil, isOn: looper.settings.countIn) { looper.settings.countIn.toggle() }
             }
             InputMeter()
+            Menu {
+                ForEach(AppTheme.allCases) { t in
+                    Button { looper.appTheme = t } label: {
+                        if t == looper.appTheme { Label(t.label, systemImage: "checkmark") } else { Text(t.label) }
+                    }
+                }
+            } label: {
+                Image(systemName: "paintpalette")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Theme")
         }
         .padding(.horizontal, 16)
         .frame(height: 58)
@@ -562,7 +575,7 @@ private struct HeroRing: View {
 
     private func subtitle(_ s: Snapshot) -> String {
         switch s.state {
-        case .empty: return "press Space to record"
+        case .empty: return "press R to record"
         case .armed: return "recording starts on beat 1"
         case .recording: return fmtTime(s.recordSeconds)
         default: return s.totalMeasures > 0 ? "bar · beat of \(s.totalMeasures) bar\(s.totalMeasures == 1 ? "" : "s")" : "bar · beat"
@@ -752,7 +765,7 @@ private struct EmptyLane: View {
             }
             .padding(.leading, 12)
             .frame(width: headerWidth, alignment: .leading)
-            Text(canDub ? "Press Space while playing to record an overdub layer" : "Overdubs appear here as an undoable layer")
+            Text(canDub ? "Press R while playing to record an overdub layer" : "Overdubs appear here as an undoable layer")
                 .font(.system(size: 12))
                 .foregroundColor(UI.muted)
             Spacer()
@@ -786,7 +799,7 @@ private struct PerformanceRow: View {
                             .foregroundColor(Color(hex: 0xB4B4BF))
                     }
                     Spacer(minLength: 8)
-                    Text("Space")
+                    Text("R")
                         .font(.system(size: 12, weight: .medium))
                         .padding(.horizontal, 9).padding(.vertical, 4)
                         .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color(hex: 0x4A4A55), lineWidth: 1))
@@ -799,11 +812,23 @@ private struct PerformanceRow: View {
                 .scaleEffect(pressed ? 0.98 : 1)
                 .animation(.easeOut(duration: 0.08), value: pressed)
             }
-            .help("Rec / Dub / Play (Space)")
+            .help("Record / overdub (R or Return)")
 
-            MomentarySwitch(onDown: { looper.stopDown() }, onUp: { looper.stopUp() }) { pressed in
-                SecondaryLabel(title: "Stop", hint: "Esc", pressed: pressed, highlight: nil)
+            Button { looper.playStop() } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: playStopSymbol(snap))
+                        .font(.system(size: 13, weight: .bold))
+                    Text(looper.playStopLabel).font(.system(size: 14, weight: .semibold))
+                    Text("Space").font(.system(size: 11)).foregroundColor(UI.muted)
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 52)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: 0x1F1F25)))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(UI.line2, lineWidth: 1))
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .help("Play / stop (Space)")
             Button { looper.undoRedo() } label: {
                 SecondaryLabel(title: snap.canRedo ? "Redo" : "Undo", hint: "⌘Z", pressed: false,
                                highlight: snap.canRedo ? UI.dub : nil)
@@ -817,6 +842,15 @@ private struct PerformanceRow: View {
             .buttonStyle(.plain)
             Spacer(minLength: 8)
             BeatLights(count: snap.beatsPerMeasure, current: live ? snap.beat : 0, color: UI.state(snap.state))
+        }
+    }
+
+    private func playStopSymbol(_ s: Snapshot) -> String {
+        switch s.state {
+        case .playing, .overdubbing: return "stop.fill"
+        case .empty: return s.rhythmRunning ? "stop.fill" : "play.fill"
+        case .armed, .autoRecArmed: return "xmark"
+        default: return "play.fill"
         }
     }
 
@@ -885,6 +919,13 @@ private struct RhythmPanel: View {
             HStack(spacing: 10) {
                 Toggle("", isOn: $looper.settings.rhythmOn).toggleStyle(.switch).labelsHidden().controlSize(.small)
                 Text("Rhythm").font(.system(size: 14, weight: .bold))
+                if looper.snapshot.state == .empty && s.rhythmOn {
+                    Button { looper.playStop() } label: {
+                        Label(looper.snapshot.rhythmRunning ? "Stop" : "Play", systemImage: looper.snapshot.rhythmRunning ? "stop.fill" : "play.fill")
+                    }
+                    .buttonStyle(PillButtonStyle())
+                    .help("Play or stop the rhythm on its own (Space)")
+                }
                 ForEach(RhythmLibrary.categories, id: \.self) { cat in
                     let selected = pattern.category == cat
                     Button(cat) {

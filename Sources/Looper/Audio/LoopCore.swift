@@ -16,6 +16,8 @@ enum LoopCommand {
     case clear
     case setLoaded(length: Int)
     case resetRhythm
+    case rhythmStart     // play the rhythm on its own (no loop yet)
+    case rhythmStop
 }
 
 /// The realtime looper engine.
@@ -84,6 +86,8 @@ final class LoopCore {
     private(set) var stopping = false
     private(set) var stopAtWrap = false
     private(set) var endingPending = false
+    /// The rhythm plays on its own while no loop exists (started with Space / Play, stopped with Space / Stop).
+    private(set) var rhythmPreview = false
     private(set) var currentLayer = -1
     private(set) var currentLayerActive = false
     private(set) var rhythmRunning = false
@@ -246,6 +250,14 @@ final class LoopCore {
         case .toggleUndo: toggleUndo()
         case .clear: clearAll()
         case .resetRhythm: rhythm.reset()
+        case .rhythmStart:
+            if rhythmOn && (state == .empty || state == .autoRecArmed) {
+                rhythm.reset()
+                rhythm.cancelSpecial()
+                rhythmPreview = true
+            }
+        case .rhythmStop:
+            rhythmPreview = false
         case .setLoaded(let len):
             if state == .empty {
                 loopLength = max(0, min(len, capacity))
@@ -282,8 +294,8 @@ final class LoopCore {
             return
         }
         if rhythmOn {
-            if quantize {
-                // Rhythm is free running in the empty state: start on the next bar line.
+            if quantize && rhythmPreview {
+                // The rhythm is already playing: start on the next bar line.
                 let pos = Double(rhythm.frame).truncatingRemainder(dividingBy: mf)
                 let remaining = Int((mf - pos).rounded())
                 if pos < 64 || remaining < 64 { beginRecording() } else {
@@ -444,7 +456,10 @@ final class LoopCore {
         case .armed, .autoRecArmed:
             state = .empty
             countingIn = false
+            rhythmPreview = false
             rhythm.cancelSpecial()
+        case .empty:
+            rhythmPreview = false
         case .playing, .overdubbing:
             if state == .overdubbing { state = .playing }
             if stopping || stopAtWrap || endingPending {             // second stop = stop now
@@ -477,6 +492,7 @@ final class LoopCore {
 
     private func enterStopped() {
         endingPending = false
+        rhythmPreview = false
         state = .stopped
         stopping = false
         stopAtWrap = false
@@ -506,6 +522,7 @@ final class LoopCore {
         loopTempo = 0
         endingPending = false
         countingIn = false
+        rhythmPreview = false
         rhythm.cancelSpecial()
         playPos = 0
         syncStretch()
@@ -817,6 +834,7 @@ final class LoopCore {
             processJobs(budget: 1 << 17)
         }
         rhythm.configure(tempo: tempo, pattern: patternIndex, variation: variation, kit: kitIndex, reverb: reverbLevel)
+        if !rhythmOn && rhythmPreview { rhythmPreview = false }
 
         let wEnd = ringWrite
         if wEnd - ringRead > n + 4096 || wEnd < ringRead { ringRead = max(0, wEnd - n) }
@@ -905,7 +923,9 @@ final class LoopCore {
 
             // Rhythm
             // the rhythm engine also runs for the metronome count-in when the rhythm itself is off
-            let rActive = (rhythmOn && state != .stopped) || (state == .armed && countingIn)
+            // Without a loop the rhythm only plays when started (rhythmPreview); with a loop it follows the transport.
+            let waiting = state == .empty || state == .autoRecArmed
+            let rActive = (rhythmOn && state != .stopped && (!waiting || rhythmPreview)) || (state == .armed && countingIn)
             let rs: (Float, Float) = rActive ? rhythm.tick() : rhythm.tail()
             if rActive { rhythmWasRunning = true }
             if endingPending && rhythm.consumeEndingDone() {

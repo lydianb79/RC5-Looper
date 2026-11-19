@@ -57,6 +57,13 @@ struct SetupView: View {
                 Toggle("Input monitor (hear the input through the app)", isOn: $looper.inputMonitor)
                 LabeledContent("Input") { LevelMeter(level: looper.snapshot.inLevel).frame(width: 180) }
             }
+            Section("Appearance") {
+                Picker("Theme", selection: $looper.appTheme) {
+                    ForEach(AppTheme.allCases) { Text($0.label).tag($0) }
+                }
+                Toggle("Show memories sidebar", isOn: $looper.showSidebar)
+                Toggle("Show rhythm panel", isOn: $looper.showRhythm)
+            }
             Section("MIDI") {
                 Picker("Tempo sync", selection: $looper.syncExternal) {
                     Text("Internal").tag(false)
@@ -380,13 +387,14 @@ struct MemoryView: View {
 
 struct HelpView: View {
     private let rows: [(String, String)] = [
-        ("Space", "Pedal: REC → DUB/PLAY → … (tap)"),
-        ("Space ×2", "Stop"),
-        ("Hold Space 2 s", "Undo / redo last overdub (playing) · Clear (stopped)"),
+        ("Space", "Play / stop (without a loop: play / stop the rhythm)"),
+        ("R  or  Return", "Record → overdub → play (like the pedal)"),
+        ("R ×2", "Stop"),
+        ("Hold R 2 s", "Undo / redo last overdub (playing) · Clear (stopped)"),
         ("Esc / S", "Stop (hold Esc 2 s = clear)"),
         ("U  or  ⌘Z", "Undo / redo the last overdub"),
         ("Delete  or  ⌘⌫", "Clear loop"),
-        ("R  or  ⌘R", "Rhythm on / off"),
+        ("M  or  ⌘R", "Rhythm on / off"),
         ("B  or  ⌘B", "Rhythm variation A / B"),
         ("T  or  ⌘T", "Tap tempo"),
         ("← / →  or  ⌘[ / ⌘]", "Previous / next memory"),

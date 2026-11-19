@@ -19,7 +19,7 @@ enum SideTab: String, CaseIterable, Identifiable {
 
 /// Main-thread brain of the app: pedal logic, memories, settings, MIDI, UI snapshot.
 final class LooperController: ObservableObject {
-    static let version = "2.0-beta.2"
+    static let version = "2.0-beta.3"
     #if arch(arm64)
     static let architecture = "Apple silicon (arm64)"
     #else
@@ -651,6 +651,36 @@ final class LooperController: ObservableObject {
         }
     }
 
+    /// Space / Play-Stop: plays and stops the loop; without a loop it starts and stops the rhythm.
+    func playStop() {
+        switch core.state {
+        case .empty:
+            if settings.rhythmOn {
+                core.send(core.rhythmPreview ? .rhythmStop : .rhythmStart)
+            } else {
+                flash("Press R (or the big button) to record a loop")
+            }
+        case .armed, .autoRecArmed:
+            core.send(.cancelArm)
+        case .recording:
+            core.send(.finishRecording(next: .playing))
+        case .playing, .overdubbing:
+            core.send(.stop)
+        case .stopped:
+            core.send(.play)
+        }
+    }
+
+    var playStopLabel: String {
+        switch snapshot.state {
+        case .empty: return snapshot.rhythmRunning ? "Stop rhythm" : (settings.rhythmOn ? "Play rhythm" : "Play")
+        case .armed, .autoRecArmed: return "Cancel"
+        case .recording: return "Close loop · Play"
+        case .playing, .overdubbing: return "Stop"
+        case .stopped: return "Play"
+        }
+    }
+
     // Transport buttons in the toolbar
     func recordButton() {
         switch core.state {
@@ -662,6 +692,7 @@ final class LooperController: ObservableObject {
 
     func playButton() {
         switch core.state {
+        case .empty: playStop()
         case .stopped: core.send(.play)
         case .overdubbing: core.send(.stopOverdub)
         case .recording: core.send(.finishRecording(next: .playing))
@@ -854,7 +885,7 @@ final class LooperController: ObservableObject {
             if core.loopLength > 0 {
                 core.send(st == .stopped ? .play : .restart)
             } else if settings.rhythmOn {
-                core.send(.resetRhythm)
+                core.send(.rhythmStart)
             }
         case 0xFB:   // Continue
             if st == .stopped && core.loopLength > 0 { core.send(.play) }
@@ -914,7 +945,10 @@ final class LooperController: ObservableObject {
             if !event.modifierFlags.intersection([.command, .control, .option]).isEmpty { return event }
             let down = event.type == .keyDown
             switch event.keyCode {
-            case 49:                                    // space = pedal
+            case 49:                                    // space = play / stop
+                if down && !event.isARepeat { self.playStop() }
+                return nil
+            case 36, 76:                                // return / enter = record · overdub (like the pedal)
                 if down { if !event.isARepeat { self.pedalDown() } } else { self.pedalUp() }
                 return nil
             case 53:                                    // escape = stop
@@ -932,11 +966,16 @@ final class LooperController: ObservableObject {
             default:
                 break
             }
+            // R = record / overdub, with the pedal's hold (undo / clear) and double-press (stop) gestures
+            if event.charactersIgnoringModifiers?.lowercased() == "r" {
+                if down { if !event.isARepeat { self.pedalDown() } } else { self.pedalUp() }
+                return nil
+            }
             guard down, !event.isARepeat, let ch = event.charactersIgnoringModifiers?.lowercased() else { return event }
             switch ch {
             case "s": self.stopDown(); self.stopUp()
             case "u": self.undoRedo()
-            case "r": self.toggleRhythm()
+            case "m": self.toggleRhythm()
             case "t": self.tapTempo()
             case "b": self.toggleVariation()
             default: return event

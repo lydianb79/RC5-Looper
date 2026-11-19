@@ -80,8 +80,10 @@ struct LooperCommands: Commands {
             Button(looper.showRhythm ? "Hide Rhythm Panel" : "Show Rhythm Panel") { looper.showRhythm.toggle() }
                 .keyboardShortcut("r", modifiers: [.control, .command])
             Divider()
-            Picker("Theme", selection: $looper.appTheme) {
-                ForEach(AppTheme.allCases) { Text($0.label).tag($0) }
+            Menu("Theme") {
+                ForEach(AppTheme.allCases) { t in
+                    Toggle(t.label, isOn: Binding(get: { looper.appTheme == t }, set: { if $0 { looper.appTheme = t } }))
+                }
             }
             Divider()
         }
@@ -90,7 +92,8 @@ struct LooperCommands: Commands {
                 .keyboardShortcut("z", modifiers: .command)
         }
         CommandMenu("Looper") {
-            Button("Rec / Play / Dub  (Space)") { looper.pedalTap() }
+            Button("Play / Stop  (Space)") { looper.playStop() }
+            Button("Record / Overdub  (R)") { looper.pedalTap() }
             Button("Stop  (Esc)") { looper.stop() }
             Button("Clear Loop") { looper.clear() }
                 .keyboardShortcut(.delete, modifiers: .command)
