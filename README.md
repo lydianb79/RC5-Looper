@@ -1,170 +1,205 @@
 <img src="Resources/Icon/AppIcon-1024.png" alt="Looper icon" width="128" align="right">
 
-# Looper — a native macOS phrase looper modeled on the BOSS RC-5
+# Looper
 
-A native SwiftUI + AVAudioEngine app for macOS 13+ (Apple silicon and Intel). It works like the RC-5: one stereo track, one pedal, rhythm guide, 99 phrase memories.
+**A native macOS phrase looper inspired by the BOSS RC-5 – with three synced tracks, a drummer that sounds like one, effects and song mode.**
 
-![Looper main window: the pedal panel on the left, the Rhythm tab on the right](docs/screenshot.png)
+Looper turns your Mac and an audio interface into a loop station. Record a phrase, layer overdubs on top, add parts on two more tracks, play along with real recorded drums and chain your loops into a song – all in one window, without a mouse if you like.
 
-*The pedal panel (display, LOOP/RHYTHM knobs, memory and rhythm keys, the big pedal, STOP/UNDO/CLEAR) with the Rhythm tab open.*
+![Looper main window](docs/screenshot.png)
 
-**Current version: 1.9.1**. Highlights:
-- **Looping:** overdub/replace with undo, and a live loop tempo (keep pitch or varispeed).
-- **Rhythm:** 57 patterns played on real recorded drums, with intro, ending and fills.
-- **Audio and MIDI:** audio interface support (device, Mono/Stereo input, output pair and buffer selection), MIDI control, and MIDI clock in and out.
+*Version 2.0 · macOS 13 Ventura or later · Apple silicon and Intel · SwiftUI + AVAudioEngine, no third-party code*
 
-## Changelog
+---
 
-| Version | Changes |
+## Contents
+
+- [Features](#features)
+- [Getting started](#getting-started)
+- [The window](#the-window)
+- [Keyboard and MIDI](#keyboard-and-midi)
+- [Build it yourself](#build-it-yourself)
+- [How it works](#how-it-works)
+- [Tips and known limits](#tips-and-known-limits)
+- [Version history](#version-history)
+- [Credits and license](#credits-and-license)
+
+---
+
+## Features
+
+### Looping
+- **RC-5 style recording:** record → overdub → play with one key (R / Return), or use the on-screen buttons. Count-in (1 or 2 bars), auto-record when you start playing, loop quantize to whole bars, a fixed loop length (1–32 bars) that stops recording by itself.
+- **Three tracks:** tracks 2 and 3 record and play in sync with track 1 and can be any number of track-1 loops long (a 2-bar riff over an 8-bar progression). Each track has its own level, mute, undo/redo and clear.
+- **Undo history:** up to 5 overdubs can be undone and redone (⌘Z / ⇧⌘Z). Replace mode is undoable too.
+- **×2 length** doubles the loop so you can overdub a longer phrase; **Mute** drops the loop while the drums keep going; **Fade out** ends a song smoothly.
+- **Live tempo:** change the tempo after recording – the loop follows, with pitch kept (time-stretch) or tape-style varispeed.
+- **Reverse, one-shot, fade-in / fade-out, stop at loop end.**
+
+### Rhythm
+- **Real drums:** multi-microphone recordings of a real kit (*Big Rusty Drums*, CC0) – up to 7 velocity layers and 4 different takes per drum, mid tom, hi-hat pedal, half-open hat and ride bell.
+- **A drummer's feel:** accents on the beat, small timing and dynamic variations per drum, varied fills that land on a crash, damped re-strikes and hi-hat choke, a natural room and gentle bus compression. The **Feel** slider goes from rigid drum machine to loose and human.
+- **About 110 patterns** in 15 styles (Rock, Pop, Funk, Soul, Blues, Jazz, Latin, World, Reggae, Hip-Hop, Metal, Electronic, Country, odd meters, metronome), each with an A and B variation, 7 kits, intro and ending.
+- **Pattern editor:** click steps to make your own grooves (accent / normal / ghost); built-in patterns are copied to your *User* patterns first.
+- Without the rhythm, an optional **metronome click** for the count-in, while recording, or always.
+
+### Effects (menu *Effects*)
+- **Input FX** (recorded with your playing) and **Loop FX** (playback only): DJ filter, tempo-synced ping-pong delay, reverb, bit crusher and tape stop. Settings are stored with each memory.
+
+### Memories and songs
+- **99 memories** with name, loop, tracks 2 and 3, rhythm, tempo, effects and all settings. Rename by double-click.
+- **Song mode:** chain memories with repeat counts; the next memory is loaded in the background and starts exactly at the loop end – no gap.
+- **Import** any audio file as a loop; **export** a loop as WAV, the whole mix (all tracks + rhythm) as WAV or AAC, or the drum pattern as a MIDI file.
+
+### Audio and MIDI
+- Any Core Audio device: input and output device, mono or stereo input (any channel pair), output pair on multichannel interfaces, buffer size, latency compensation.
+- **MIDI learn** for 18 actions (record, play/stop, undo, tracks 2/3, ×2, song …) from any pedal, key or knob, plus a fixed remote map.
+- **MIDI clock** out (virtual port "Looper") and external clock in (tempo, Start / Stop / Continue).
+
+### Look
+- 14 themes, each with its own background artwork and colours – Graphite, Midnight, Synthwave, Aurora, Ember, Ocean, Forest, Daylight, Sunset, Neon City, Terminal, Sakura, Arctic and Vintage Tape (View › Theme, ⌃⌘1…9).
+
+---
+
+## Getting started
+
+1. **Build the apps** (see [Build it yourself](#build-it-yourself)) and open **Looper (arm64).app** on Apple silicon or **Looper (x86_64).app** on an Intel Mac. The apps are ad-hoc signed: the first time, right-click → **Open**.
+2. Allow **microphone access** when macOS asks.
+3. Open **Settings › Audio** (⌘,) and choose your interface, mono or stereo input, the output pair and the buffer size. Use headphones or monitors – the built-in mic and speakers feed back into the loop.
+4. Optional: switch the **Rhythm** on and pick a style, or turn on **Count-in**.
+5. Press **R** (or click **Record**) and play. Press **R** again to close the loop – it plays (or goes straight into overdub, depending on *Rec action*).
+6. Press **R** to overdub, **Space** to stop and start, **⌘Z** to undo, **2** / **3** to record tracks 2 and 3.
+7. **⌘S** writes everything into the current memory.
+
+---
+
+## The window
+
+| Area | What it does |
 |---|---|
-| **1.9.1** | **Count-in and Intro now work with the rhythm off**: a one-bar metronome count (accented click on beat 1) before recording. The loop keeps the count tempo and is fitted to whole bars, so turning the rhythm on later stays in time. About Looper shows the real version, and there's a new Help menu. |
-| 1.9 | **Stereo input:** the Audio tab now has an Input setting, Mono or Stereo. Stereo records a channel pair (Inputs 1 + 2 by default, 3 + 4, … or custom left/right), with separate L/R input meters. **About Looper** now shows the real version, build number and architecture; the build scripts and CI write the version into Info.plist. New **Help** menu: Help & Shortcuts (⌘?), Release Notes, GitHub. |
-| 1.8 | Rhythm **intro** (count + fill) and **ending** (fill + final hit), a fill when switching variation A↔B, and **external MIDI clock** sync (tempo, Start/Stop/Continue). Labelled arm64 / x86_64 release builds (CI and `release.sh`). |
-| 1.7 | Output pair selection for multichannel interfaces. |
-| 1.6 | **Real recorded drums** (Karoryfer *Big Rusty Drums*, CC0) with velocity layers and round-robin takes. |
-| 1.5 | 32-voice drum sample engine. |
-| 1.4 | Redesigned "stage gear" interface with Midnight, Crimson and Arctic themes, plus an app icon. |
-| 1.3 | The pedal panel always fits the screen (scrolls), plus a pattern menu and ‹ › buttons. |
-| 1.2 | Dedicated Audio tab (⌘,). |
-| 1.1 | Input/output device and buffer size selection, live loop tempo (keep pitch / varispeed). |
-| 1.0 | First version: RC-5 style looper, 57 rhythm patterns, 99 memories, MIDI control. |
+| **Toolbar** | Transport (record, play, stop), the display (state, bar.beat, time, tempo – click the BPM to type a tempo), Tap, Rhythm and Count-in switches, loop length, input meter, theme. |
+| **Sidebar** | *Memories* (99 slots; double-click to rename, right-click for more) or *Song* (song mode steps). |
+| **Ring** | The loop as a circular waveform with the play head, bar ticks and the current bar.beat. |
+| **Track lanes** | Track 1 with its overdubs, tracks 2 and 3 with record / overdub / play buttons, undo, redo, clear, mute and level. |
+| **Buttons** | **Record** (only records: start, or close the loop), Play/Stop, Overdub, Clear, Undo, Redo, ×2, Mute, Fade out, beat lights. |
+| **Rhythm** | On/off, play, pattern and kit, A/B, Feel, Room and Level, styles, Edit, Intro, Ending, Count-in, and the step grid. |
 
-## Download
+Everything fits in one window without scrolling (minimum 1180 × 800). Hide the sidebar (⌃⌘S) or the rhythm panel (⌃⌘R) for more room. The **Effects** window opens from the Effects menu (⌥⌘F), all settings are in **Settings** (⌘,).
 
-Ready-made builds are on the [Releases page](https://github.com/lydianb79/RC5-Looper/releases/latest):
+---
 
-| File | For |
+## Keyboard and MIDI
+
+| Key | Action |
 |---|---|
-| `Looper-<version>-arm64.zip` → **Looper (arm64).app** | Apple silicon Macs (M1, M2, M3, M4) |
-| `Looper-<version>-x86_64.zip` → **Looper (x86_64).app** | Intel Macs (also runs on Apple silicon under Rosetta) |
+| **R** or **Return** | Record → overdub → play, like the RC-5 pedal (hold 2 s: undo/redo or clear, double-press: stop) |
+| **Space** | Play / stop (without a loop: play / stop the rhythm) |
+| **Esc** or **S** | Stop |
+| **⌘Z / ⇧⌘Z**, **U** | Undo / redo overdubs, U toggles the last one |
+| **2 / 3** | Track 2 / 3: record → overdub ↔ play |
+| **D** | ×2 loop length |
+| **X** | Mute / unmute the loop |
+| **F** | Fade out and stop |
+| **Delete** or **⌘⌫** | Clear |
+| **M** or **⌘R** | Rhythm on / off |
+| **B** or **⌘B** | Rhythm variation A / B |
+| **T** or **⌘T** | Tap tempo |
+| **← / →**, **⌘[ / ⌘]** | Previous / next memory |
+| **⌘S** | Write memory |
+| **⇧⌘P** | Start / stop the song |
+| **⌘I / ⌘E / ⇧⌘E** | Import audio / export loop / export mix or MIDI |
+| **⌥⌘F** | Effects window |
+| **⌃⌘1 … ⌃⌘9** | Themes |
 
-The apps are ad-hoc signed, not notarized. On first launch, right-click the app, choose **Open** and confirm. macOS then asks for microphone access.
+**MIDI:** Settings › Loop › *MIDI learn* assigns any note, CC or program change to an action. The built-in map also works: CC80 pedal · CC81 stop · CC82 undo · CC83 clear · CC84 rhythm · CC85 variation · CC86 loop level · notes 60–66 · program change 0–98 selects a memory.
 
-## Build from source
+---
 
-Requirements: macOS 13 Ventura or later, plus Xcode 15+ (or the Xcode Command Line Tools with Swift 5.9+).
+## Build it yourself
+
+**Requirements:** macOS 13 or later and Xcode 15 or later (or just the Command Line Tools: `xcode-select --install`).
 
 ```bash
 git clone https://github.com/lydianb79/RC5-Looper.git
 cd RC5-Looper
-./build_app.sh release --open      # builds build/Looper.app for this Mac and launches it
+./build_local.sh --open
 ```
 
-To update later, run `git pull && ./build_app.sh release --open`. Copy `build/Looper.app` to /Applications if you like.
+or double-click **`Build Looper.command`** in Finder. The script builds both architectures and puts them in `build/<version>/`:
 
-You can also run `open Package.swift` to work in Xcode. For recording, run the bundled app from the build script: a bare executable has no `NSMicrophoneUsageDescription`, so macOS won't grant it microphone access.
-
-### Building for a specific architecture
-
-```bash
-swift build -c release --arch arm64     # Apple silicon
-swift build -c release --arch x86_64    # Intel (cross-compiles fine on Apple silicon)
-```
-
-### Build and release from your Mac
-
-`release.sh` builds both architectures and publishes them as the GitHub release `v<version>`, with the same file names as the CI. It needs the GitHub CLI: `brew install gh`, then `gh auth login`.
-
-```bash
-./release.sh               # build arm64 + x86_64, zip, create or update release v<version>
-./release.sh --build-only  # only build build/Looper-<version>-{arm64,x86_64}.zip, upload nothing
-./release.sh --draft       # create a new release as a draft
-./release.sh --yes         # skip the confirmation prompt
-```
-
-The version comes from `LooperController.version`. The script stops if you have uncommitted or unpushed changes, so a release always matches a commit on GitHub. If the release already exists, its files are replaced. A brand-new release also creates the tag `v<version>`, which starts the GitHub Actions build too; it re-uploads equivalent files to the same release.
-
-### Automated builds (GitHub Actions)
-
-`.github/workflows/build.yml` builds both architectures on a macOS runner. It packages them as labelled, ad-hoc signed apps, `Looper (arm64).app` and `Looper (x86_64).app`, and publishes them as the GitHub release `v<version>`. The version is taken from `LooperController.version`.
-
-To make a new release:
-1. Raise `static let version` in `Sources/Looper/Model/LooperController.swift` and push.
-2. On GitHub, go to **Actions › Build macOS apps › Run workflow**.
-
-Running the workflow again for the same version replaces that release's files.
-
-## First steps
-
-1. **Audio** tab (also the AUDIO key on the panel, or ⌘,): choose the input and output device (built-in, a USB/Thunderbolt audio interface, or an aggregate device), Mono or Stereo input and its channels, the output pair and the buffer size.
-2. Set **Latency compensation** (also on the Audio tab) so overdubs line up with what you hear.
-3. Press **Space** (or click the big pedal) to record, press again to close the loop, and keep pressing to overdub.
-4. Turn on **Rhythm** and pick a pattern and kit on the Rhythm tab. Use **WRITE** (⌘S) to save the loop to one of the 99 memories.
-
-## RC-5 feature mapping
-
-| RC-5 | Looper |
+| App | For |
 |---|---|
-| 1 stereo track, 32-bit float | Stereo 32-bit float engine at the device sample rate. Max loop length is set on the Audio tab (default 10 min; memory is only used for what you record). |
-| Pedal: REC → DUB → PLAY | Big pedal / **Space**. Rec action can be REC→DUB→PLAY or REC→PLAY→DUB. |
-| Double press = STOP | Double-press the pedal (or **Esc**, the STOP footswitch). |
-| Hold pedal = UNDO/REDO, hold when stopped = CLEAR | Same (2 s hold). UNDO/REDO and CLEAR footswitches too. |
-| Overdub / Replace dub mode | Both modes. Replace is also undoable. |
-| Loop quantize | Loop length snaps to whole bars when the rhythm is on. |
-| Auto rec, count-in | Both, with an adjustable auto-rec threshold. The count-in plays one bar of the rhythm, or metronome clicks when the rhythm is off. |
-| Start: immediate / fade in · Stop: immediate / fade out / loop end | All of them, with adjustable fade time. A second stop press stops right away. |
-| One shot, reverse | Both. |
-| Tempo: tap / derived from loop, change loop tempo | Tap tempo (**T**). Without rhythm, the tempo is worked out from the loop length. After recording, the tempo stays live: changing it (slider, tap, ±) speeds the loop up or down from 50 % to 200 % and the rhythm follows. **Keep pitch** uses a granular time-stretch; **Varispeed** works like tape, so the pitch follows the speed. You can overdub at any tempo. **Original tempo** returns to the recorded speed. |
-| — | Audio device selection (input/output). **Input: Mono or Stereo**: Mono records one channel in the centre; Stereo records a channel pair (Inputs 1 + 2, 3 + 4, … or custom left/right) with separate L/R meters. On multichannel interfaces you can also choose the output pair (Outputs 1–2, 3–4, …). Buffer size from 32 to 2048 frames. |
-| 57 rhythm patterns × 2 variations, 7 kits, rhythm reverb | 57 patterns (Rock, Pop, Funk, Blues, Jazz, Latin, Reggae, Metal, Electronic, Country, odd meters, metronome), each with variations A and B. The 7 kits are Studio, Live, Light (brushes), Heavy, Rock (rimshots), Metal and Electronic (synthesized 808/909 style). The acoustic kits play **real multi-mic drum recordings**: Karoryfer *Big Rusty Drums*, CC0, bundled in `Resources/Drums`. Each drum has 3 velocity layers × 2 round-robin takes and is tuned and saturated per kit. Playback uses a 32-voice engine, so cymbals ring out, the closed hi-hat chokes the open one, and each kit has its own room reverb. |
-| Rhythm intro / ending, fill-in | **Intro**: a one-bar count with a fill before recording starts. **Ending**: STOP plays a fill and stops loop and rhythm together on the next bar line with a crash and kick. Press STOP again to stop right away. Switching variation A↔B plays a fill in the last beat. |
-| Loop level / rhythm level | LOOP LEVEL knob (0–200) and rhythm level. |
-| 99 phrase memories (audio + rhythm/kit/settings) | 99 memories in `~/Library/Application Support/Looper/Memories/NN/` (`loop.wav` + `settings.json`). Switching memories with unsaved changes asks first. |
-| USB WAV import / export | Import any audio file (WAV/AIFF/CAF/MP3/M4A; it is resampled) and export as 32-bit float WAV. |
-| MIDI I/O, sync | MIDI remote control from all MIDI inputs. **Tempo sync**: Internal (MIDI clock + start/stop go out on a virtual port called "Looper") or External MIDI clock. In External mode the tempo follows the incoming clock, so a recorded loop changes speed. MIDI Start plays from the top, Stop stops and Continue resumes. |
+| `Looper (arm64).app` | Apple silicon Macs (M1 – M4) |
+| `Looper (x86_64).app` | Intel Macs (also runs under Rosetta) |
 
-### MIDI map
-CC80 pedal (≥64 press / <64 release) · CC81 stop · CC82 undo/redo · CC83 clear · CC84 rhythm on/off · CC85 variation A/B · CC86 loop level · Note 60 pedal, 61 stop, 62 undo, 63 clear, 64 rhythm, 65 tap, 66 variation · Program change 0–98 selects memory 1–99.
+It also writes a zip of each next to the apps. To update, run `git pull` and build again.
 
-### Keyboard
-Space pedal · Esc/S stop · U undo/redo · Delete clear · R rhythm · B variation · T tap · ←/→ memory · ⌘S write · ⌘I import · ⌘E export.
+Notes:
+- `open Package.swift` opens the project in Xcode. For recording, run the app bundle from the script – a bare executable has no microphone usage description, so macOS won't grant it microphone access.
+- `release.sh` builds both apps and publishes them as a GitHub release (optional, needs the `gh` CLI). The GitHub workflow in `.github/workflows` can compile-check or build releases in the cloud.
+- `python3 Tools/make_icon.py` regenerates the app icon (needs Pillow and `rsvg-convert`); `Tools/drums/build_drums.py` rebuilds the drum samples from the original recordings.
 
-## Drum samples
-The acoustic recordings (`Resources/Drums`, ~21 MB) come from Karoryfer Samples' *Big Rusty Drums* (CC0, see `Resources/Drums/LICENSE-SAMPLES.md`). `build_app.sh` copies them into the app. To rebuild them from the source FLACs, run `Tools/drums/build_drums.py`. It needs Python, NumPy, SciPy and ffmpeg.
+---
 
-## App icon
-`Resources/AppIcon.icns` is copied into the app bundle by `build_app.sh`. The source artwork is in `Resources/Icon/` (SVG + 1024 px PNG). Run `python3 Tools/make_icon.py` to regenerate it.
-
-## Architecture
+## How it works
 
 ```
 Sources/Looper
-├── App/LooperApp.swift          SwiftUI app, menu commands
+├── App/LooperApp.swift            app, windows, menus (Theme submenu in AppKit)
 ├── Audio/
-│   ├── LoopCore.swift           realtime looper: state machine, layers, undo, quantize, fades, latency comp, time-stretch
-│   ├── AudioDevices.swift       Core Audio device list, channel counts, buffer size, latency
-│   ├── RhythmEngine.swift       step sequencer + reverb
-│   ├── DrumSamples.swift        recorded-sample loading, synthesized fallback voices, sample bank, 32-voice player
-│   ├── RhythmLibrary.swift      57 patterns, 7 kits
-│   └── AudioEngineManager.swift AVAudioEngine graph (sink node → core → source node)
-├── Model/
-│   ├── LooperController.swift   pedal logic (tap / double / hold), memories, MIDI, keyboard, UI snapshot
-│   ├── MemoryStore.swift        99 memories, WAV read/write
-│   └── Settings.swift           enums, per-memory settings
-├── MIDI/MIDIManager.swift       CoreMIDI in/out, clock out, clock-in tempo detection
-└── Views/                       pedal panel, display, Audio / Setup / Rhythm / Memory / Help panels
-
-Resources/                       Info.plist, AppIcon.icns, Icon/ (artwork), Drums/ (CC0 recordings)
-Tools/                           make_icon.py, drums/build_drums.py
-docs/                            screenshot.png (README image)
-.github/workflows/build.yml      CI: arm64 + x86_64 builds → GitHub release
-build_app.sh                     local build → build/Looper.app
-release.sh                       local arm64 + x86_64 build → GitHub release v<version>
+│   ├── LoopCore.swift             realtime engine: transport state machine, quantize, fades, latency
+│   │                              compensation, time-stretch, tracks, FX, song swap, rhythm mixing
+│   ├── LayerStack.swift           base + overdub layers of one track: undo history, ×2, merging jobs
+│   ├── SubTrack.swift             tracks 2 / 3, locked to track 1 by cycle and position
+│   ├── Effects.swift              filter, delay, reverb, bit crusher, tape stop
+│   ├── RhythmEngine.swift         step sequencer with groove (accents, timing, dynamics, fills)
+│   ├── RhythmLibrary.swift        patterns, kits, user pattern store
+│   ├── DrumSamples.swift          sample bank (16-bit, loudness manifest), 64-voice player, synth fallback
+│   ├── DrumBus.swift              room reverb (feedback delay network) and bus compressor
+│   ├── AudioEngineManager.swift   AVAudioEngine graph: input sink → core → output source
+│   └── AudioDevices.swift         Core Audio devices, channels, buffer size
+├── Model/                         controller (keys, pedal logic, memories, MIDI, song, export), settings, storage
+├── MIDI/                          CoreMIDI in/out, clock, MIDI learn
+└── Views/                         main window, track lanes, rhythm panel, effects, song, settings, themes
+Resources/                         Info.plist, AppIcon.icns, icon artwork, Drums/ (recordings + manifest)
+Tools/                             icon and drum sample generators
+build_local.sh, Build Looper.command   local arm64 + x86_64 build
 ```
 
-Realtime design: the audio thread never allocates or blocks. UI commands go through a small queue that the audio thread reads with `os_unfair_lock_trylock`. The loop is stored as `base + layerA + layerB`. Each overdub writes to its own layer, so undo/redo just mutes or unmutes it. When the next overdub starts, the previous layer is merged into the base a chunk at a time. Merging waits 2.5 s, so a double-press or a hold can still cancel the overdub that was just started.
+- **Realtime safe:** the audio thread never allocates or waits. The UI sends commands through a small queue the audio thread empties with a non-blocking lock; everything else is plain values read once per callback.
+- **Layers instead of copies:** every overdub goes into its own layer buffer, so undo and redo just mute or unmute it. Layers that fall out of the history, discarded layers and the ×2 copy are processed a slice per audio callback, so no big copy ever causes a dropout.
+- **Tracks in lockstep:** tracks 2 and 3 never keep their own clock. Their position is derived from track 1 (cycle × length + position), so they stay in sync through tempo changes, restarts, reverse and ×2.
+- **Seamless songs:** the next memory is read into spare buffers during the last repeat and swapped in by the audio thread exactly at the loop point.
+- **Drums:** each hit picks the recorded layer whose measured loudness matches the velocity, a random take, and is tuned by resampling (Hermite interpolation).
 
-## Tips & known limits
-- **Themes:** Midnight (default), Crimson (RC-5 red) and Arctic — palette icon in the header or Setup › Appearance.
-- **External MIDI clock** only follows the tempo. MIDI Start restarts from the top, but the beat isn't locked tick by tick, so very long sessions may drift slightly.
-- **Latency compensation** (Audio tab) shifts overdubs so they line up with what you heard. Start from the estimate, then fine-tune by ear.
-- Use headphones, or plug a guitar into an audio interface: the built-in mic plus speakers will feed back into the loop.
-- The buffer size is a device setting, so it also affects other apps using the same interface.
-- Different input and output devices run on separate clocks. If they won't start together or drift, combine them into an Aggregate Device in Audio MIDI Setup.
-- On interfaces with more than two outputs, choose the output pair on the Audio tab. The other outputs are muted while Looper is running.
-- The memory always stores the loop at its recorded tempo, together with the current tempo. Export WAV writes the loop at its original speed.
-- Keep pitch stretching is a simple granular method. Very large tempo changes can sound slightly phasey; Varispeed sounds clean but shifts the pitch.
+---
 
-## Credits & license
-- **Drum recordings:** *Big Rusty Drums* by Karoryfer Samples (CC0). See `Resources/Drums/LICENSE-SAMPLES.md`.
-- BOSS and RC-5 are trademarks of Roland Corporation. This project is an independent app inspired by the RC-5 and is not affiliated with or endorsed by Roland.
+## Tips and known limits
+
+- Fine-tune **latency compensation** (Settings › Audio) by ear so overdubs line up with what you heard.
+- The buffer size is a device setting and also affects other apps on the same interface.
+- Different input and output devices run on separate clocks; if they drift, combine them into an Aggregate Device in Audio MIDI Setup.
+- Tracks 2 and 3 can't record while *Reverse* is on.
+- *Keep pitch* stretching is a simple granular method: very large tempo changes can sound a little phasey; *Varispeed* is clean but changes the pitch.
+- External MIDI clock follows the tempo and Start / Stop, but isn't locked tick by tick, so very long sessions may drift slightly.
+- Memories, songs, user patterns and settings live in `~/Library/Application Support/Looper` and the app's preferences.
+
+---
+
+## Version history
+
+| Version | Changes |
+|---|---|
+| **2.0** | New studio window that fits on one screen; three synced tracks; undo history (5 steps); ×2, mute and fade out; input and loop effects; song mode; mix and MIDI export; MIDI learn; pattern editor and ~50 new patterns; count-in length and metronome click; much more natural drums (more recordings, groove engine, room); fixed loop length; typed tempo entry; 14 themes; new icon; local build script for both architectures. |
+| 1.9 | Stereo input, About window with version, Help menu, count-in and intro also without rhythm. |
+| 1.8 | Rhythm intro, ending and fills; external MIDI clock; labelled arm64 / x86_64 builds. |
+| 1.7 | Output pair selection for multichannel interfaces. |
+| 1.6 | Real recorded drums. |
+| 1.0 – 1.5 | First RC-5 style looper with 57 patterns, 99 memories, MIDI control, device and buffer selection, live loop tempo, themes and icon. |
+
+---
+
+## Credits and license
+
+- **Drum recordings:** *Big Rusty Drums* by [Karoryfer Samples](https://karoryfer.com), CC0 – see `Resources/Drums/LICENSE-SAMPLES.md`.
+- BOSS and RC-5 are trademarks of Roland Corporation. Looper is an independent project inspired by the RC-5 and is not affiliated with or endorsed by Roland.

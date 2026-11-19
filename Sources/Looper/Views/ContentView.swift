@@ -431,7 +431,8 @@ struct HelpView: View {
         ("← / →  or  ⌘[ / ⌘]", "Previous / next memory"),
         ("⌘S", "Write memory"),
         ("Double-click a memory", "Rename it"),
-        ("⌃⌘S / ⌃⌘R / ⌃⌘T / ⌃⌘E", "Show or hide memories / rhythm / tracks / effects"),
+        ("⌃⌘S / ⌃⌘R", "Show or hide memories / rhythm panel"),
+        ("⌥⌘F", "Effects window"),
         ("⌃⌘1 … ⌃⌘9", "Themes"),
         ("⌘I / ⌘E", "Import audio / export WAV"),
     ]
