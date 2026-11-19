@@ -97,8 +97,11 @@ struct SetupView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Toggle("Send MIDI clock + start/stop on virtual port \"Looper\"", isOn: $looper.midiClockOut)
-                Text("Remote control: CC80 pedal · CC81 stop · CC82 undo · CC83 clear · CC84 rhythm · CC85 variation · CC86 loop level · Notes 60–66 · Program change 0–98 selects memory")
+                Text("Built-in remote control: CC80 pedal · CC81 stop · CC82 undo · CC83 clear · CC84 rhythm · CC85 variation · CC86 loop level · Notes 60–66 · Program change 0–98 selects memory. Learned assignments below take priority.")
                     .font(.caption).foregroundStyle(.secondary)
+            }
+            Section("MIDI learn – click Learn, then press a pedal, key or knob on your controller") {
+                MIDILearnView()
             }
         }
         .formStyle(.grouped)
@@ -413,7 +416,14 @@ struct HelpView: View {
         ("R ×2", "Stop"),
         ("Hold R 2 s", "Undo / redo last overdub (playing) · Clear (stopped)"),
         ("Esc / S", "Stop (hold Esc 2 s = clear)"),
-        ("U  or  ⌘Z", "Undo / redo the last overdub"),
+        ("⌘Z / ⇧⌘Z", "Undo / redo overdubs (up to 5 steps)"),
+        ("U", "Undo / redo the last overdub (toggle)"),
+        ("2 / 3", "Track 2 / 3: record → overdub ↔ play"),
+        ("D  or  ⌘D", "Double the loop length (×2)"),
+        ("X", "Mute / unmute the loop (rhythm keeps playing)"),
+        ("F", "Fade out and stop"),
+        ("⇧⌘P", "Start / stop the song"),
+        ("⇧⌘E", "Export mix (audio) or rhythm (MIDI)"),
         ("Delete  or  ⌘⌫", "Clear loop"),
         ("M  or  ⌘R", "Rhythm on / off"),
         ("B  or  ⌘B", "Rhythm variation A / B"),
@@ -421,7 +431,8 @@ struct HelpView: View {
         ("← / →  or  ⌘[ / ⌘]", "Previous / next memory"),
         ("⌘S", "Write memory"),
         ("Double-click a memory", "Rename it"),
-        ("⌃⌘S / ⌃⌘R", "Show or hide memories / rhythm panel"),
+        ("⌃⌘S / ⌃⌘R / ⌃⌘T / ⌃⌘E", "Show or hide memories / rhythm / tracks / effects"),
+        ("⌃⌘1 … ⌃⌘9", "Themes"),
         ("⌘I / ⌘E", "Import audio / export WAV"),
     ]
 

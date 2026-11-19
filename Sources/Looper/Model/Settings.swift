@@ -184,6 +184,7 @@ struct Snapshot: Equatable {
     var redoDepth = 0
     var doubling = false
     var swapPending = false
+    var masterCycle = 0
     var tracks: [TrackSnapshot] = [TrackSnapshot(), TrackSnapshot()]
 }
 

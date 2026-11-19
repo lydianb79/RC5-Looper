@@ -128,6 +128,7 @@ struct StudioView: View {
                              set: { looper.renamingSlot = $0?.id })) { target in
             RenameSheet(slot: target.id).environmentObject(looper)
         }
+        .sheet(isPresented: $looper.showExport) { ExportSheet().environmentObject(looper) }
         .sheet(item: Binding(get: { looper.renamingPattern.map { RenameTarget(id: $0) } },
                              set: { looper.renamingPattern = $0?.id })) { target in
             PatternRenameSheet(index: target.id).environmentObject(looper)
@@ -404,6 +405,16 @@ private struct MemorySidebar: View {
     var body: some View {
         let used = looper.memoryInfo.filter { $0.seconds != nil }.count
         VStack(alignment: .leading, spacing: 8) {
+            Picker("", selection: $looper.showSong) {
+                Text("Memories").tag(false)
+                Text(looper.songActive ? "Song ▶" : "Song").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, 4)
+            if looper.showSong {
+                SongPanel()
+            } else {
             HStack {
                 Text("MEMORIES").font(.system(size: 10.5, weight: .bold)).tracking(1.2).foregroundColor(UI.muted)
                 Text("\(used) / 99").font(.system(size: 11)).foregroundColor(UI.muted)
@@ -440,7 +451,8 @@ private struct MemorySidebar: View {
             }
             HStack(spacing: 6) {
                 Button("Import…") { looper.importAudio() }.buttonStyle(PillButtonStyle(full: true))
-                Button("Export…") { looper.exportAudio() }.buttonStyle(PillButtonStyle(full: true))
+                Button("Export…") { looper.showExport = true }.buttonStyle(PillButtonStyle(full: true))
+            }
             }
         }
         .padding(.vertical, 14)
@@ -522,7 +534,10 @@ private struct StageView: View {
                 LanesView()
             }
             PerformanceRow()
+            LoopToolsRow()
+            if looper.showTracks { TracksPanel().transition(.opacity) }
             if looper.showRhythm { RhythmPanel().transition(.opacity) }
+            if looper.showEffects { EffectsPanel().transition(.opacity) }
         }
         .frame(maxWidth: 1400, alignment: .leading)
     }
@@ -872,13 +887,6 @@ private struct PerformanceRow: View {
             }
             .buttonStyle(.plain)
             .help("Play / stop (Space)")
-            Button { looper.undoRedo() } label: {
-                SecondaryLabel(title: snap.canRedo ? "Redo" : "Undo", hint: "⌘Z", pressed: false,
-                               highlight: snap.canRedo ? UI.dub : nil)
-            }
-            .buttonStyle(.plain)
-            .disabled(!(snap.canUndo || snap.canRedo))
-            .opacity(snap.canUndo || snap.canRedo ? 1 : 0.5)
             Button { looper.clear() } label: {
                 SecondaryLabel(title: "Clear", hint: "⌘⌫", pressed: false, highlight: nil)
             }

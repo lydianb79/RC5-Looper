@@ -19,7 +19,7 @@ enum SideTab: String, CaseIterable, Identifiable {
 
 /// Main-thread brain of the app: pedal logic, memories, settings, MIDI, UI snapshot.
 final class LooperController: ObservableObject {
-    static let version = "2.0-beta.9"
+    static let version = "2.0-beta.10"
     #if arch(arm64)
     static let architecture = "Apple silicon (arm64)"
     #else
@@ -75,6 +75,12 @@ final class LooperController: ObservableObject {
     @Published var patternsVersion = 0
     /// User pattern slot whose rename sheet is open.
     @Published var renamingPattern: Int?
+    @Published var showTracks: Bool = UserDefaults.standard.object(forKey: "showTracks") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(showTracks, forKey: "showTracks") }
+    }
+    @Published var showEffects: Bool = UserDefaults.standard.object(forKey: "showEffects") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(showEffects, forKey: "showEffects") }
+    }
     /// Memory slot whose rename sheet is open.
     @Published var renamingSlot: Int?
     @Published private(set) var audioStatus = "Starting audio…"
@@ -535,6 +541,7 @@ final class LooperController: ObservableObject {
         s.redoDepth = c.redoDepth
         s.doubling = c.stack.doubling
         s.swapPending = c.swapPending
+        s.masterCycle = c.masterCycle
         for t in 0..<2 {
             let tr = c.sub(t)
             var ts = TrackSnapshot()
@@ -1119,6 +1126,11 @@ final class LooperController: ObservableObject {
             switch ch {
             case "s": self.stopDown(); self.stopUp()
             case "u": self.undoRedo()
+            case "2": self.trackPress(0)
+            case "3": self.trackPress(1)
+            case "d": self.doubleLoop()
+            case "x": self.toggleDrop()
+            case "f": self.fadeOut()
             case "m": self.toggleRhythm()
             case "t": self.tapTempo()
             case "b": self.toggleVariation()

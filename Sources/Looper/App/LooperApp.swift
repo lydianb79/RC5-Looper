@@ -45,6 +45,8 @@ struct LooperCommands: Commands {
     @AppStorage("appTheme") private var themeName = AppTheme.midnight.rawValue
     @AppStorage("showSidebar") private var sidebarShown = true
     @AppStorage("showRhythm") private var rhythmShown = true
+    @AppStorage("showTracks") private var tracksShown = true
+    @AppStorage("showEffects") private var fxShown = true
 
     static func showAbout() {
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "–"
@@ -85,6 +87,10 @@ struct LooperCommands: Commands {
                 .keyboardShortcut("s", modifiers: [.control, .command])
             Button(rhythmShown ? "Hide Rhythm Panel" : "Show Rhythm Panel") { looper.showRhythm.toggle() }
                 .keyboardShortcut("r", modifiers: [.control, .command])
+            Button(tracksShown ? "Hide Tracks" : "Show Tracks") { looper.showTracks.toggle() }
+                .keyboardShortcut("t", modifiers: [.control, .command])
+            Button(fxShown ? "Hide Effects" : "Show Effects") { looper.showEffects.toggle() }
+                .keyboardShortcut("e", modifiers: [.control, .command])
             Divider()
             // The menu bar no longer observes the controller (see above), so it is only rebuilt
             // when one of the values it shows changes and the submenu stays open.
@@ -101,8 +107,10 @@ struct LooperCommands: Commands {
             Divider()
         }
         CommandGroup(replacing: .undoRedo) {
-            Button("Undo / Redo Last Overdub") { looper.undoRedo() }
+            Button("Undo Overdub") { looper.undo() }
                 .keyboardShortcut("z", modifiers: .command)
+            Button("Redo Overdub") { looper.redo() }
+                .keyboardShortcut("z", modifiers: [.command, .shift])
         }
         CommandMenu("Looper") {
             Button("Play / Stop  (Space)") { looper.playStop() }
@@ -110,6 +118,16 @@ struct LooperCommands: Commands {
             Button("Stop  (Esc)") { looper.stop() }
             Button("Clear Loop") { looper.clear() }
                 .keyboardShortcut(.delete, modifiers: .command)
+            Divider()
+            Button("Track 2 Record / Overdub  (2)") { looper.trackPress(0) }
+            Button("Track 3 Record / Overdub  (3)") { looper.trackPress(1) }
+            Button("Double Loop Length ×2  (D)") { looper.doubleLoop() }
+                .keyboardShortcut("d", modifiers: .command)
+            Button("Mute / Unmute Loop  (X)") { looper.toggleDrop() }
+            Button("Fade Out and Stop  (F)") { looper.fadeOut() }
+            Divider()
+            Button("Start / Stop Song") { if looper.songActive { looper.stopSong() } else { looper.startSong() } }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
             Divider()
             Button("Rhythm On / Off") { looper.toggleRhythm() }
                 .keyboardShortcut("r", modifiers: .command)
@@ -129,6 +147,8 @@ struct LooperCommands: Commands {
                 .keyboardShortcut("i", modifiers: .command)
             Button("Export Loop as WAV…") { looper.exportAudio() }
                 .keyboardShortcut("e", modifiers: .command)
+            Button("Export Mix / Rhythm MIDI…") { looper.showExport = true }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
         }
     }
 }
