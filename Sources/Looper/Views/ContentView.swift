@@ -19,6 +19,11 @@ struct SetupView: View {
                     ForEach(DubMode.allCases) { Text($0.label).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                Picker("Loop length", selection: $looper.settings.loopLength) {
+                    ForEach(LoopLengthOptions.bars, id: \.self) { Text(LoopLengthOptions.label($0)).tag($0) }
+                }
+                Text("With a loop length set, recording stops by itself after that many bars at the current tempo and continues as set in Rec action. None = you close the loop yourself.")
+                    .font(.caption).foregroundColor(.secondary)
                 Toggle("Loop quantize (snap loop to whole bars when rhythm is on)", isOn: $looper.settings.quantize)
                 Toggle("Count-in (one bar before recording; metronome clicks when the rhythm is off)", isOn: $looper.settings.countIn)
                 Toggle("Auto rec (recording starts when you play)", isOn: $looper.settings.autoRec)
@@ -422,7 +427,7 @@ struct HelpView: View {
                 LabeledContent("Architecture", value: LooperController.architecture)
             }
             Section("How it works") {
-                Text("Press the pedal to record. Press again to close the loop: depending on Rec action it goes straight into overdub or into playback. Every overdub sits on its own layer, so the latest one can always be undone and redone. With Rhythm on and Loop quantize enabled, the loop length snaps to whole bars and the tempo is kept; without rhythm, the tempo is derived from the loop length.")
+                Text("Press the pedal to record. Press again to close the loop: depending on Rec action it goes straight into overdub or into playback. Every overdub sits on its own layer, so the latest one can always be undone and redone. With Rhythm on and Loop quantize enabled, the loop length snaps to whole bars and the tempo is kept; without rhythm, the tempo is derived from the loop length. Set a Loop length (toolbar or Settings › Loop) to have recording stop by itself after a fixed number of bars.")
                 Text("Set Latency compensation so overdubs line up with what you hear (the estimate is a good start; use headphones or a guitar via an audio interface to avoid feedback from the speakers).")
             }
         }

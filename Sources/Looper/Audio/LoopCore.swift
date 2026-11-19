@@ -69,6 +69,10 @@ final class LoopCore {
     var kitIndex = 0
     var reverbLevel: Float = 0.2
     var humanize: Float = 0.6
+    /// Fixed loop length in bars (0 = free). Recording then ends by itself after that many bars.
+    var fixedBars = 0
+    /// What follows a fixed-length recording (overdub or play).
+    var fixedNext: LoopState = .playing
     var inputSampleRate: Double = 0
     var inputLeftChannel = 0
     var inputRightChannel = 1
@@ -332,6 +336,10 @@ final class LoopCore {
         updateGains()
         rhythm.reset()
         rhythm.cancelSpecial()
+        if fixedBars > 0 {
+            pendingEnd = max(Int(0.25 * sampleRate), min(capacity, Int((Double(fixedBars) * rhythm.measureFrames).rounded())))
+            pendingNext = fixedNext
+        }
         loopGeneration &+= 1
     }
 

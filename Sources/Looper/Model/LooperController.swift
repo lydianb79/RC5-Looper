@@ -19,7 +19,7 @@ enum SideTab: String, CaseIterable, Identifiable {
 
 /// Main-thread brain of the app: pedal logic, memories, settings, MIDI, UI snapshot.
 final class LooperController: ObservableObject {
-    static let version = "2.0-beta.4"
+    static let version = "2.0-beta.5"
     #if arch(arm64)
     static let architecture = "Apple silicon (arm64)"
     #else
@@ -295,6 +295,8 @@ final class LooperController: ObservableObject {
         c.rhythmLevel = Float(settings.rhythmLevel)
         c.reverbLevel = Float(settings.rhythmReverb)
         c.humanize = Float(settings.rhythmHumanize)
+        c.fixedBars = settings.loopLength
+        c.fixedNext = settings.recAction == .recDubPlay && !settings.oneShot ? .overdubbing : .playing
         c.stretchMode = settings.stretchMode
         c.tempo = settings.tempo
     }
@@ -567,7 +569,8 @@ final class LooperController: ObservableObject {
             settings.loopMeasures = Int(countBars)
             core.loopTempo = 0
             settings.tempo = (exact * 10).rounded() / 10
-        } else if withRhythm {
+        } else if withRhythm || settings.loopLength > 0 {
+            // rhythm tempo, or a fixed length recorded at the current tempo: keep the tempo
             let mf = p.beats * 60.0 / settings.tempo * sr
             settings.loopMeasures = max(1, Int((Double(L) / mf).rounded()))
         } else {
@@ -645,7 +648,9 @@ final class LooperController: ObservableObject {
         switch snapshot.state {
         case .empty: return settings.autoRec ? "Arm auto rec" : "Record"
         case .armed, .autoRecArmed: return "Cancel"
-        case .recording: return settings.recAction == .recDubPlay && !settings.oneShot ? "Close loop · Overdub" : "Close loop · Play"
+        case .recording:
+            if settings.loopLength > 0 { return "Stops after \(LoopLengthOptions.label(settings.loopLength))" }
+            return settings.recAction == .recDubPlay && !settings.oneShot ? "Close loop · Overdub" : "Close loop · Play"
         case .playing: return settings.oneShot ? "Restart" : "Overdub"
         case .overdubbing: return "Play"
         case .stopped: return "Play"
@@ -676,7 +681,7 @@ final class LooperController: ObservableObject {
         switch snapshot.state {
         case .empty: return snapshot.rhythmRunning ? "Stop rhythm" : (settings.rhythmOn ? "Play rhythm" : "Play")
         case .armed, .autoRecArmed: return "Cancel"
-        case .recording: return "Close loop · Play"
+        case .recording: return settings.loopLength > 0 ? "Play after \(LoopLengthOptions.label(settings.loopLength))" : "Close loop · Play"
         case .playing, .overdubbing: return "Stop"
         case .stopped: return "Play"
         }

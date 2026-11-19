@@ -190,6 +190,7 @@ private struct StudioHeader: View {
             HStack(spacing: 6) {
                 PillToggle(title: "Rhythm", symbol: "metronome", isOn: looper.settings.rhythmOn) { looper.toggleRhythm() }
                 PillToggle(title: "Count-in", symbol: nil, isOn: looper.settings.countIn) { looper.settings.countIn.toggle() }
+                LoopLengthMenu()
             }
             InputMeter()
             Menu {
@@ -1113,6 +1114,43 @@ private struct TransportButton: View {
         .buttonStyle(.plain)
         .help(help)
         .accessibilityLabel(help)
+    }
+}
+
+/// Toolbar menu for the fixed loop length ("Length: None / 4 bars").
+private struct LoopLengthMenu: View {
+    @EnvironmentObject var looper: LooperController
+
+    var body: some View {
+        let bars = looper.settings.loopLength
+        let on = bars > 0
+        Menu {
+            ForEach(LoopLengthOptions.bars, id: \.self) { b in
+                Button {
+                    looper.settings.loopLength = b
+                } label: {
+                    if b == bars { Label(LoopLengthOptions.label(b), systemImage: "checkmark") } else { Text(LoopLengthOptions.label(b)) }
+                }
+                if b == 0 { Divider() }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "ruler")
+                Text(on ? LoopLengthOptions.label(bars) : "Length")
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
+            }
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundColor(on ? .white : UI.text2)
+            .padding(.horizontal, 11)
+            .frame(height: 30)
+            .background(RoundedRectangle(cornerRadius: 8).fill(on ? UI.rhythm.opacity(0.28) : UI.control))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(on ? UI.rhythm : UI.line2, lineWidth: 1))
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Loop length: recording stops by itself after this many bars (None = close the loop yourself)")
     }
 }
 

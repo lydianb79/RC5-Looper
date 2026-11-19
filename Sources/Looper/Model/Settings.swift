@@ -86,13 +86,14 @@ struct MemorySettings: Codable, Equatable {
     var loopTempo = 0.0          // tempo the loop audio was recorded at (0 = same as tempo)
     var stretchMode = StretchMode.keepPitch
     var loopMeasures = 0
+    var loopLength = 0           // fixed loop length in bars (0 = none: you close the loop yourself)
     var savedSeconds = 0.0
     var thumb: [Float] = []      // small waveform preview for the memory list
 
     enum CodingKeys: String, CodingKey {
         case name, recAction, dubMode, quantize, autoRec, countIn, startMode, stopMode, fadeSeconds
         case thumb, oneShot, reverse, loopLevel, rhythmOn, rhythmPattern, rhythmVariation, rhythmKit
-        case rhythmLevel, rhythmReverb, rhythmHumanize, rhythmIntro, rhythmEnding, tempo, loopTempo, stretchMode, loopMeasures, savedSeconds
+        case rhythmLevel, rhythmReverb, rhythmHumanize, rhythmIntro, rhythmEnding, tempo, loopTempo, stretchMode, loopMeasures, loopLength, savedSeconds
     }
 
     static func defaults(for slot: Int) -> MemorySettings {
@@ -135,6 +136,7 @@ extension MemorySettings {
         loopTempo = v(.loopTempo, loopTempo)
         stretchMode = v(.stretchMode, stretchMode)
         loopMeasures = v(.loopMeasures, loopMeasures)
+        loopLength = v(.loopLength, loopLength)
         savedSeconds = v(.savedSeconds, savedSeconds)
         thumb = v(.thumb, thumb)
     }
@@ -177,4 +179,10 @@ struct MemoryInfo: Identifiable, Equatable {
     var tempo: Double = 0
     var bars = 0
     var rhythm = false
+}
+
+/// Choices for the fixed loop length (bars); 0 = none.
+enum LoopLengthOptions {
+    static let bars = [0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 24, 32]
+    static func label(_ b: Int) -> String { b == 0 ? "None" : "\(b) bar\(b == 1 ? "" : "s")" }
 }
