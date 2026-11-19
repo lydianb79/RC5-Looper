@@ -38,7 +38,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 struct LooperCommands: Commands {
-    @ObservedObject var looper: LooperController
+    /// Not observed on purpose: the controller publishes the transport state many times a
+    /// second, and observing it would rebuild the menu bar constantly (submenus would close
+    /// as soon as they open). The few values the menus show are read from UserDefaults.
+    let looper: LooperController
+    @AppStorage("appTheme") private var themeName = AppTheme.midnight.rawValue
+    @AppStorage("showSidebar") private var sidebarShown = true
+    @AppStorage("showRhythm") private var rhythmShown = true
 
     static func showAbout() {
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "–"
@@ -75,16 +81,16 @@ struct LooperCommands: Commands {
             }
         }
         CommandGroup(replacing: .sidebar) {
-            Button(looper.showSidebar ? "Hide Memories" : "Show Memories") { looper.showSidebar.toggle() }
+            Button(sidebarShown ? "Hide Memories" : "Show Memories") { looper.showSidebar.toggle() }
                 .keyboardShortcut("s", modifiers: [.control, .command])
-            Button(looper.showRhythm ? "Hide Rhythm Panel" : "Show Rhythm Panel") { looper.showRhythm.toggle() }
+            Button(rhythmShown ? "Hide Rhythm Panel" : "Show Rhythm Panel") { looper.showRhythm.toggle() }
                 .keyboardShortcut("r", modifiers: [.control, .command])
             Divider()
             // Themes are listed directly in the View menu: SwiftUI submenus in the menu bar
             // don't respond reliably on every macOS version.
             Text("Theme")
             ForEach(AppTheme.allCases) { t in
-                Button((looper.appTheme == t ? "✓  " : "     ") + t.label) { looper.appTheme = t }
+                Button((themeName == t.rawValue ? "✓  " : "     ") + t.label) { looper.appTheme = t }
                     .keyboardShortcut(KeyEquivalent(Character(String((AppTheme.allCases.firstIndex(of: t) ?? 0) + 1))),
                                       modifiers: [.control, .command])
             }
