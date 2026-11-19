@@ -66,7 +66,7 @@ Looper turns your Mac and an audio interface into a loop station. Record a phras
 
 ## Getting started
 
-1. **Build the apps** (see [Build it yourself](#build-it-yourself)) and open **Looper (arm64).app** on Apple silicon or **Looper (x86_64).app** on an Intel Mac. The apps are ad-hoc signed: the first time, right-click → **Open**.
+1. **Download** `Looper-2.0-arm64.zip` (Apple silicon) or `Looper-2.0-x86_64.zip` (Intel) from the [latest release](https://github.com/lydianb79/RC5-Looper/releases/latest), or **build the apps** yourself (see [Build it yourself](#build-it-yourself)), and open **Looper (arm64).app** on Apple silicon or **Looper (x86_64).app** on an Intel Mac. The apps are ad-hoc signed: the first time, right-click → **Open**.
 2. Allow **microphone access** when macOS asks.
 3. Open **Settings › Audio** (⌘,) and choose your interface, mono or stereo input, the output pair and the buffer size. Use headphones or monitors – the built-in mic and speakers feed back into the loop.
 4. Optional: switch the **Rhythm** on and pick a style, or turn on **Count-in**.
@@ -139,7 +139,7 @@ It also writes a zip of each next to the apps. To update, run `git pull` and bui
 
 Notes:
 - `open Package.swift` opens the project in Xcode. For recording, run the app bundle from the script – a bare executable has no microphone usage description, so macOS won't grant it microphone access.
-- `release.sh` builds both apps and publishes them as a GitHub release (optional, needs the `gh` CLI). The GitHub workflow in `.github/workflows` can compile-check or build releases in the cloud.
+- Releases are built locally with `build_local.sh`; the zips are published with the *Publish locally built apps* workflow (or `release.sh`, which needs the `gh` CLI). The *Build macOS apps* workflow can compile-check or build in the cloud.
 - `python3 Tools/make_icon.py` regenerates the app icon (needs Pillow and `rsvg-convert`); `Tools/drums/build_drums.py` rebuilds the drum samples from the original recordings.
 
 ---
