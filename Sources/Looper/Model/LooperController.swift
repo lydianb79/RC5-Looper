@@ -19,7 +19,7 @@ enum SideTab: String, CaseIterable, Identifiable {
 
 /// Main-thread brain of the app: pedal logic, memories, settings, MIDI, UI snapshot.
 final class LooperController: ObservableObject {
-    static let version = "2.0-beta.1"
+    static let version = "2.0-beta.2"
     #if arch(arm64)
     static let architecture = "Apple silicon (arm64)"
     #else
@@ -39,9 +39,20 @@ final class LooperController: ObservableObject {
     @Published var pendingMemorySwitch: Int?
     @Published var message: String?
     @Published var selectedTab: SideTab = .setup
-    @Published var themeID: ThemeID = ThemeID(rawValue: UserDefaults.standard.string(forKey: "theme") ?? "") ?? .midnight {
-        didSet { UserDefaults.standard.set(themeID.rawValue, forKey: "theme") }
+    @Published var appTheme: AppTheme = AppTheme(rawValue: UserDefaults.standard.string(forKey: "appTheme") ?? "") ?? .midnight {
+        didSet {
+            UI.theme = appTheme
+            UserDefaults.standard.set(appTheme.rawValue, forKey: "appTheme")
+        }
     }
+    @Published var showSidebar: Bool = UserDefaults.standard.object(forKey: "showSidebar") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(showSidebar, forKey: "showSidebar") }
+    }
+    @Published var showRhythm: Bool = UserDefaults.standard.object(forKey: "showRhythm") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(showRhythm, forKey: "showRhythm") }
+    }
+    /// Memory slot whose rename sheet is open.
+    @Published var renamingSlot: Int?
     @Published private(set) var audioStatus = "Starting audio…"
     @Published private(set) var inputGranted = false
 
@@ -158,6 +169,7 @@ final class LooperController: ObservableObject {
         memoryIndex = max(0, min(MemoryStore.slotCount - 1, lastSlot))
         settings = store.loadSettings(memoryIndex) ?? MemorySettings.defaults(for: memoryIndex)
         applySettings()          // property observers don't fire inside init
+        UI.theme = appTheme
         applyGlobals()
 
         midi.onMessage = { [weak self] s, a, b in self?.handleMIDI(s, a, b) }
@@ -753,6 +765,17 @@ final class LooperController: ObservableObject {
         } catch {
             flash("Write failed: \(error.localizedDescription)")
         }
+    }
+
+    /// Renames any memory slot right away (stored in its settings file).
+    func renameMemory(_ slot: Int, to newName: String) {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = trimmed.isEmpty ? MemorySettings.defaults(for: slot).name : String(trimmed.prefix(40))
+        var s = store.loadSettings(slot) ?? (slot == memoryIndex ? settings : MemorySettings.defaults(for: slot))
+        s.name = name
+        try? store.saveSettings(s, slot: slot)
+        if slot == memoryIndex { settings.name = name }
+        if slot >= 0 && slot < memoryInfo.count { memoryInfo[slot] = store.info(slot) }
     }
 
     func deleteMemory() {

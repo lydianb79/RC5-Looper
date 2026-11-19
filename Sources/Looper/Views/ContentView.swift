@@ -184,98 +184,152 @@ struct AudioSetupView: View {
 
 struct RhythmView: View {
     @EnvironmentObject var looper: LooperController
+    @State private var category = ""
+
+    private static let icons: [String: String] = [
+        "Rock": "guitars", "Pop": "music.mic", "Funk": "figure.dance", "Blues": "music.note",
+        "Jazz": "music.quarternote.3", "Latin": "sun.max", "Reggae": "leaf", "Metal": "bolt",
+        "Electronic": "waveform", "Country": "music.note.house", "Odd Meter": "function", "Metronome": "metronome",
+    ]
 
     var body: some View {
-        Form {
-            Section {
-                Toggle("Rhythm", isOn: $looper.settings.rhythmOn)
-                Toggle("Intro — one bar count + fill before recording starts", isOn: $looper.settings.rhythmIntro)
-                Toggle("Ending — STOP plays a fill and stops on the next bar with a final hit", isOn: $looper.settings.rhythmEnding)
-                LabeledContent("Pattern") {
-                    Button { looper.selectPattern((looper.settings.rhythmPattern + RhythmLibrary.patterns.count - 1) % RhythmLibrary.patterns.count) } label: {
-                        Image(systemName: "chevron.left")
-                    }
-                    Picker("", selection: Binding(get: { looper.settings.rhythmPattern }, set: { looper.selectPattern($0) })) {
-                        ForEach(RhythmLibrary.categories, id: \.self) { cat in
-                            Section(cat) {
-                                ForEach(RhythmLibrary.patterns.indices.filter { RhythmLibrary.patterns[$0].category == cat }, id: \.self) { i in
-                                    Text(String(format: "%02d  ", i + 1) + RhythmLibrary.patterns[i].name).tag(i)
-                                }
-                            }
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(maxWidth: 240)
-                    Button { looper.selectPattern((looper.settings.rhythmPattern + 1) % RhythmLibrary.patterns.count) } label: {
-                        Image(systemName: "chevron.right")
-                    }
+        let s = looper.settings
+        VStack(spacing: 0) {
+            // top bar: on/off, kit, variation, fills
+            HStack(spacing: 14) {
+                Toggle("Rhythm", isOn: $looper.settings.rhythmOn).toggleStyle(.switch)
+                Divider().frame(height: 20)
+                Picker("Kit", selection: $looper.settings.rhythmKit) {
+                    ForEach(0..<RhythmLibrary.kitNames.count, id: \.self) { Text(RhythmLibrary.kitNames[$0]).tag($0) }
                 }
+                .frame(width: 170)
                 Picker("Variation", selection: $looper.settings.rhythmVariation) {
                     Text("A").tag(0)
                     Text("B").tag(1)
                 }
                 .pickerStyle(.segmented)
-                Picker("Kit", selection: $looper.settings.rhythmKit) {
-                    ForEach(0..<RhythmLibrary.kitNames.count, id: \.self) { i in
-                        Text(RhythmLibrary.kitNames[i]).tag(i)
+                .frame(width: 150)
+                Spacer()
+                Toggle("Intro", isOn: $looper.settings.rhythmIntro)
+                Toggle("Ending", isOn: $looper.settings.rhythmEnding)
+                Toggle("Count-in", isOn: $looper.settings.countIn)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            Divider()
+
+            HStack(spacing: 0) {
+                // styles
+                List(selection: Binding(get: { category }, set: { category = $0 ?? category })) {
+                    Section("Styles") {
+                        ForEach(RhythmLibrary.categories, id: \.self) { cat in
+                            Label(cat, systemImage: Self.icons[cat] ?? "music.note")
+                                .badge(RhythmLibrary.patterns.filter { $0.category == cat }.count)
+                                .tag(cat)
+                        }
                     }
                 }
-                LabeledContent("Tempo") {
-                    Slider(value: Binding(get: { looper.settings.tempo }, set: { looper.setTempo($0) }), in: looper.tempoRange)
-                        .disabled(looper.tempoLocked)
-                    Text(String(format: "%.1f", looper.settings.tempo)).monospacedDigit().frame(width: 48)
-                    Stepper("", onIncrement: { looper.setTempo(looper.settings.tempo + 1) },
-                            onDecrement: { looper.setTempo(looper.settings.tempo - 1) })
-                        .labelsHidden()
-                        .disabled(looper.tempoLocked)
-                    Button("Tap") { looper.tapTempo() }
-                }
-                if looper.hasLoop {
-                    LabeledContent("Loop speed") {
-                        Text("\(Int((looper.snapshot.tempo / max(1, looper.snapshot.loopTempo) * 100).rounded())) %  ·  recorded at ♩\(String(format: "%.1f", looper.snapshot.loopTempo)), \(looper.settings.loopMeasures) bar\(looper.settings.loopMeasures == 1 ? "" : "s")")
-                            .monospacedDigit()
-                        Button("Original tempo") { looper.resetTempo() }
-                            .disabled(abs(looper.snapshot.tempo - looper.snapshot.loopTempo) < 0.05)
+                .listStyle(.sidebar)
+                .frame(width: 190)
+
+                // patterns of the style
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 12)], spacing: 12) {
+                        ForEach(RhythmLibrary.patterns.indices.filter { RhythmLibrary.patterns[$0].category == category }, id: \.self) { i in
+                            PatternCard(index: i, selected: s.rhythmPattern == i, variation: s.rhythmVariation, core: looper.core)
+                                .onTapGesture { looper.selectPattern(i) }
+                        }
                     }
-                    Picker("Tempo change", selection: $looper.settings.stretchMode) {
-                        ForEach(StretchMode.allCases) { Text($0.label).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    Text("Changing the tempo speeds the recorded loop up or down (50–200 %), and the rhythm follows. Overdubs recorded at another tempo are fitted into the loop.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                LabeledContent("Rhythm level") {
-                    Slider(value: $looper.settings.rhythmLevel, in: 0...2)
-                    Text("\(Int(looper.settings.rhythmLevel * 100))").monospacedDigit().frame(width: 48)
-                }
-                LabeledContent("Reverb") {
-                    Slider(value: $looper.settings.rhythmReverb, in: 0...1)
-                    Text("\(Int(looper.settings.rhythmReverb * 100))").monospacedDigit().frame(width: 48)
+                    .padding(16)
                 }
             }
-            ForEach(RhythmLibrary.categories, id: \.self) { cat in
-                Section(cat) {
-                    ForEach(RhythmLibrary.patterns.indices.filter { RhythmLibrary.patterns[$0].category == cat }, id: \.self) { i in
-                        let p = RhythmLibrary.patterns[i]
-                        HStack {
-                                Text(String(format: "%02d", i + 1)).monospacedDigit().foregroundStyle(.secondary)
-                                Text(p.name)
-                                Spacer()
-                                Text(p.signature).foregroundStyle(.secondary)
-                                Text("♩\(Int(p.tempo))").monospacedDigit().foregroundStyle(.secondary).frame(width: 44, alignment: .trailing)
-                                Image(systemName: "checkmark")
-                                    .opacity(looper.settings.rhythmPattern == i ? 1 : 0)
-                                    .foregroundStyle(Color.accentColor)
-                        }
-                        .padding(.vertical, 2)
-                        .background(looper.settings.rhythmPattern == i ? Color.accentColor.opacity(0.18) : Color.clear)
-                        .contentShape(Rectangle())
-                        .onTapGesture { looper.selectPattern(i) }
-                    }
+            Divider()
+
+            // tempo + levels
+            HStack(spacing: 18) {
+                HStack(spacing: 8) {
+                    Text("Tempo")
+                    Slider(value: Binding(get: { looper.settings.tempo }, set: { looper.setTempo($0) }), in: looper.tempoRange)
+                        .frame(width: 160)
+                        .disabled(looper.tempoLocked)
+                    Text(String(format: "%.1f", looper.settings.tempo)).monospacedDigit().frame(width: 44, alignment: .trailing)
+                    Button("Tap") { looper.tapTempo() }
+                }
+                HStack(spacing: 8) {
+                    Text("Level")
+                    Slider(value: $looper.settings.rhythmLevel, in: 0...2).frame(width: 110)
+                }
+                HStack(spacing: 8) {
+                    Text("Room")
+                    Slider(value: $looper.settings.rhythmReverb, in: 0...1).frame(width: 90)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+        .onAppear { category = RhythmLibrary.pattern(looper.settings.rhythmPattern).category }
+    }
+}
+
+/// One rhythm pattern as a card: name, meter, tempo and a small preview of its grid.
+private struct PatternCard: View {
+    let index: Int
+    let selected: Bool
+    let variation: Int
+    let core: LoopCore
+
+    var body: some View {
+        let p = RhythmLibrary.pattern(index)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(p.name).font(.system(size: 13, weight: .semibold))
+                Spacer()
+                if selected { Image(systemName: "checkmark.circle.fill").foregroundColor(.accentColor) }
+            }
+            Text("\(p.signature) · ♩\(Int(p.tempo))")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            MiniGrid(index: index, variation: selected ? variation : 0, core: core)
+                .frame(height: 30)
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 10).fill(selected ? Color.accentColor.opacity(0.16) : Color(nsColor: .controlBackgroundColor)))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(selected ? Color.accentColor : Color(nsColor: .separatorColor), lineWidth: selected ? 2 : 1))
+        .contentShape(Rectangle())
+        .help("Click to select (turns the rhythm on)")
+    }
+}
+
+/// Kick / snare / hi-hat rows of a pattern, drawn small.
+private struct MiniGrid: View {
+    let index: Int
+    let variation: Int
+    let core: LoopCore
+
+    var body: some View {
+        Canvas { ctx, size in
+            let p = RhythmLibrary.pattern(index)
+            let steps = max(1, min(kMaxSteps, p.steps))
+            // pick up to three rows that have hits, preferring kick, snare, hats/ride/rim
+            let order = [0, 1, 2, 4, 8, 9, 10, 3, 6, 7, 5]
+            var rows: [Int] = []
+            for d in order where rows.count < 3 {
+                if (0..<steps).contains(where: { core.rhythm.cell(pattern: index, variation: variation, drum: d, step: $0) > 0 }) { rows.append(d) }
+            }
+            let gap: CGFloat = 2
+            let w = (size.width - gap * CGFloat(steps - 1)) / CGFloat(steps)
+            let h = (size.height - gap * 2) / 3
+            for (r, d) in rows.enumerated() {
+                for i in 0..<steps {
+                    let v = core.rhythm.cell(pattern: index, variation: variation, drum: d, step: i)
+                    let rect = CGRect(x: CGFloat(i) * (w + gap), y: CGFloat(r) * (h + gap), width: w, height: h)
+                    let color: Color = v > 0 ? Color.accentColor.opacity(0.35 + 0.65 * Double(v)) : Color.secondary.opacity(0.15)
+                    ctx.fill(Path(roundedRect: rect, cornerRadius: 2), with: .color(color))
                 }
             }
         }
-        .formStyle(.grouped)
+        .accessibilityHidden(true)
     }
 }
 
@@ -330,13 +384,15 @@ struct HelpView: View {
         ("Space ×2", "Stop"),
         ("Hold Space 2 s", "Undo / redo last overdub (playing) · Clear (stopped)"),
         ("Esc / S", "Stop (hold Esc 2 s = clear)"),
-        ("U  or  ⌘U", "Undo / redo"),
+        ("U  or  ⌘Z", "Undo / redo the last overdub"),
         ("Delete  or  ⌘⌫", "Clear loop"),
         ("R  or  ⌘R", "Rhythm on / off"),
         ("B  or  ⌘B", "Rhythm variation A / B"),
         ("T  or  ⌘T", "Tap tempo"),
         ("← / →  or  ⌘[ / ⌘]", "Previous / next memory"),
         ("⌘S", "Write memory"),
+        ("Double-click a memory", "Rename it"),
+        ("⌃⌘S / ⌃⌘R", "Show or hide memories / rhythm panel"),
         ("⌘I / ⌘E", "Import audio / export WAV"),
     ]
 

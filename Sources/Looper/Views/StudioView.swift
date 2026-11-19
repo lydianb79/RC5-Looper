@@ -14,11 +14,14 @@ extension Color {
 }
 
 enum UI {
-    static let bg = Color(hex: 0x121215)
-    static let panel = Color(hex: 0x17171B)
-    static let header = Color(hex: 0x1C1C21)
+    /// Set by LooperController when the theme changes.
+    static var theme: AppTheme = .graphite
+    static var panel: Color { theme.palette.panel }
+    static var header: Color { theme.palette.header }
+    static var line: Color { theme.palette.line }
+    static var rhythm: Color { theme.palette.accent }
+    static var selection: Color { theme.palette.selection }
     static let lcd = Color(hex: 0x0A0A0C)
-    static let line = Color(hex: 0x26262C)
     static let line2 = Color(hex: 0x2E2E35)
     static let control = Color(hex: 0x24242A)
     static let controlHi = Color(hex: 0x2E2E35)
@@ -27,8 +30,6 @@ enum UI {
     static let muted = Color(hex: 0x8E8E99)
     static let base = Color(hex: 0x8EA2FF)
     static let dub = Color(hex: 0xFFB340)
-    static let rhythm = Color(hex: 0x5E7BFF)
-    static let selection = Color(hex: 0x2A3A8F)
 
     static func state(_ s: LoopState) -> Color {
         switch s {
@@ -95,13 +96,13 @@ private struct SettingsButton14<Label: View>: View {
 
 struct StudioView: View {
     @EnvironmentObject var looper: LooperController
-    @State private var showSidebar = true
 
     var body: some View {
+        let snap = looper.snapshot
         VStack(spacing: 0) {
-            StudioHeader(showSidebar: $showSidebar)
+            StudioHeader(showSidebar: $looper.showSidebar)
             HStack(spacing: 0) {
-                if showSidebar {
+                if looper.showSidebar {
                     MemorySidebar()
                         .frame(width: 244)
                         .overlay(alignment: .trailing) { Rectangle().fill(UI.line).frame(width: 1) }
@@ -115,12 +116,18 @@ struct StudioView: View {
             }
             StudioFooter()
         }
-        .background(UI.bg)
+        .background(ThemeBackground(theme: looper.appTheme, stateColor: UI.state(snap.state),
+                                    live: snap.state == .playing || snap.state == .overdubbing || snap.state == .recording))
         .ignoresSafeArea(.container, edges: .top)
         .foregroundColor(UI.text)
         .preferredColorScheme(.dark)
         .tint(UI.rhythm)
-        .animation(.easeInOut(duration: 0.2), value: showSidebar)
+        .animation(.easeInOut(duration: 0.2), value: looper.showSidebar)
+        .animation(.easeInOut(duration: 0.2), value: looper.showRhythm)
+        .sheet(item: Binding(get: { looper.renamingSlot.map { RenameTarget(id: $0) } },
+                             set: { looper.renamingSlot = $0?.id })) { target in
+            RenameSheet(slot: target.id).environmentObject(looper)
+        }
         .overlay(alignment: .top) {
             if let msg = looper.message {
                 Text(msg)
@@ -337,7 +344,6 @@ private struct InputMeter: View {
 
 private struct MemorySidebar: View {
     @EnvironmentObject var looper: LooperController
-    @State private var query = ""
 
     var body: some View {
         let used = looper.memoryInfo.filter { $0.seconds != nil }.count
@@ -353,20 +359,19 @@ private struct MemorySidebar: View {
                 }
             }
             .padding(.horizontal, 6)
-            TextField("Search", text: $query)
-                .textFieldStyle(.roundedBorder)
-                .padding(.horizontal, 4)
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 2) {
-                        ForEach(filtered) { info in
+                        ForEach(looper.memoryInfo) { info in
                             MemoryRow(info: info, selected: info.id == looper.memoryIndex,
                                       liveThumb: info.id == looper.memoryIndex ? looper.waveform : nil)
                                 .id(info.id)
                                 .contentShape(Rectangle())
+                                .onTapGesture(count: 2) { looper.renamingSlot = info.id }
                                 .onTapGesture { looper.selectMemory(info.id) }
                                 .contextMenu {
                                     Button("Load") { looper.selectMemory(info.id) }
+                                    Button("Rename…") { looper.renamingSlot = info.id }
                                     if info.id == looper.memoryIndex {
                                         Button("Write current loop") { looper.writeMemory() }
                                         Button("Delete memory", role: .destructive) { looper.deleteMemory() }
@@ -387,11 +392,6 @@ private struct MemorySidebar: View {
         .background(UI.panel)
     }
 
-    private var filtered: [MemoryInfo] {
-        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !q.isEmpty else { return looper.memoryInfo }
-        return looper.memoryInfo.filter { $0.name.lowercased().contains(q) || String(format: "%02d", $0.id + 1).contains(q) }
-    }
 }
 
 private struct MemoryRow: View {
@@ -408,12 +408,12 @@ private struct MemoryRow: View {
                 .frame(width: 28, height: 28)
                 .background(RoundedRectangle(cornerRadius: 8).fill(selected ? UI.base : UI.control))
             VStack(alignment: .leading, spacing: 4) {
-                Text(empty ? "Empty slot" : info.name)
+                Text(info.name)
                     .font(.system(size: 12.5, weight: .semibold))
                     .foregroundColor(empty ? UI.muted : UI.text)
                     .lineLimit(1)
                 if empty {
-                    Text("—").font(.system(size: 11)).foregroundColor(UI.muted)
+                    Text("empty").font(.system(size: 11)).foregroundColor(UI.muted)
                 } else {
                     ThumbView(values: thumb, color: selected ? .white : Color(hex: 0x6B6B78))
                         .frame(height: 12)
@@ -466,7 +466,7 @@ private struct StageView: View {
                 LanesView()
             }
             PerformanceRow()
-            RhythmPanel()
+            if looper.showRhythm { RhythmPanel().transition(.opacity) }
         }
         .frame(maxWidth: 1400, alignment: .leading)
     }
@@ -478,10 +478,16 @@ private struct TitleRow: View {
     var body: some View {
         let snap = looper.snapshot
         HStack(spacing: 10) {
-            TextField("Memory name", text: $looper.settings.name)
-                .textFieldStyle(.plain)
+            Text(looper.settings.name)
                 .font(.system(size: 22, weight: .bold))
-                .fixedSize()
+                .lineLimit(1)
+                .onTapGesture(count: 2) { looper.renamingSlot = looper.memoryIndex }
+                .help("Double-click to rename")
+            Button { looper.renamingSlot = looper.memoryIndex } label: {
+                Image(systemName: "pencil").font(.system(size: 12, weight: .semibold)).foregroundColor(UI.muted)
+            }
+            .buttonStyle(.plain)
+            .help("Rename memory")
             if looper.dirty {
                 Circle().fill(UI.dub).frame(width: 7, height: 7).help("Not written yet")
             }
@@ -1076,7 +1082,7 @@ private struct PillToggle: View {
             .foregroundColor(isOn ? .white : UI.text2)
             .padding(.horizontal, 11)
             .frame(height: 30)
-            .background(RoundedRectangle(cornerRadius: 8).fill(isOn ? UI.rhythm.opacity(0.85) : UI.control))
+            .background(RoundedRectangle(cornerRadius: 8).fill(isOn ? UI.rhythm.opacity(0.28) : UI.control))
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(isOn ? UI.rhythm : UI.line2, lineWidth: 1))
             .contentShape(Rectangle())
         }
@@ -1135,6 +1141,39 @@ struct PillButtonStyle: ButtonStyle {
     }
 }
 
+// MARK: - Rename
+
+private struct RenameTarget: Identifiable { let id: Int }
+
+private struct RenameSheet: View {
+    @EnvironmentObject var looper: LooperController
+    @Environment(\.dismiss) private var dismiss
+    let slot: Int
+    @State private var name = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Rename memory \(String(format: "%02d", slot + 1))").font(.headline)
+            TextField("Name", text: $name)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 300)
+                .onSubmit { commit() }
+            HStack {
+                Spacer()
+                Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Rename") { commit() }.keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .onAppear { name = looper.memoryInfo.first { $0.id == slot }?.name ?? "" }
+    }
+
+    private func commit() {
+        looper.renameMemory(slot, to: name)
+        dismiss()
+    }
+}
+
 // MARK: - Settings window
 
 struct SettingsView: View {
@@ -1148,6 +1187,6 @@ struct SettingsView: View {
             MemoryView().tabItem { Label("Memories", systemImage: "square.stack.3d.up") }.tag(SideTab.memory)
             HelpView().tabItem { Label("Help", systemImage: "questionmark.circle") }.tag(SideTab.help)
         }
-        .frame(minWidth: 660, idealWidth: 700, minHeight: 560, idealHeight: 680)
+        .frame(minWidth: 760, idealWidth: 820, minHeight: 600, idealHeight: 700)
     }
 }

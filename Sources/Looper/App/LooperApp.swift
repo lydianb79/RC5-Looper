@@ -24,6 +24,11 @@ struct LooperApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // no window tabs: removes the meaningless tab items from the View menu
+        NSWindow.allowsAutomaticWindowTabbing = false
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
@@ -33,7 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 struct LooperCommands: Commands {
-    let looper: LooperController
+    @ObservedObject var looper: LooperController
 
     static func showAbout() {
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "–"
@@ -68,6 +73,17 @@ struct LooperCommands: Commands {
             Button("Looper on GitHub") {
                 if let url = URL(string: "https://github.com/lydianb79/RC5-Looper") { NSWorkspace.shared.open(url) }
             }
+        }
+        CommandGroup(replacing: .sidebar) {
+            Button(looper.showSidebar ? "Hide Memories" : "Show Memories") { looper.showSidebar.toggle() }
+                .keyboardShortcut("s", modifiers: [.control, .command])
+            Button(looper.showRhythm ? "Hide Rhythm Panel" : "Show Rhythm Panel") { looper.showRhythm.toggle() }
+                .keyboardShortcut("r", modifiers: [.control, .command])
+            Divider()
+            Picker("Theme", selection: $looper.appTheme) {
+                ForEach(AppTheme.allCases) { Text($0.label).tag($0) }
+            }
+            Divider()
         }
         CommandGroup(replacing: .undoRedo) {
             Button("Undo / Redo Last Overdub") { looper.undoRedo() }
