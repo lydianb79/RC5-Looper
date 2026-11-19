@@ -48,7 +48,7 @@ extension LooperController {
                 r.reset()
                 drums = r
             }
-            let fx = FXUnit(sampleRate: sr)
+            let fx = FXChain(sampleRate: sr)
             LooperController.apply(s.loopFX, to: fx)
             fx.tempo = tempo
             do {

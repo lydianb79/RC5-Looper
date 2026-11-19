@@ -86,11 +86,88 @@ struct FXSettings: Codable, Equatable {
     }
 }
 
-/// One realtime effect slot. Parameters are plain properties written by the UI thread.
+/// The stored effect chain of one slot (input or loop): every effect type once, each with
+/// its own switch and knobs, in the order filter → bit crusher → delay → reverb → tape stop.
+struct FXChainSettings: Codable, Equatable {
+    var on = true                         // master switch of the chain
+    var effects: [FXSettings] = FXType.allCases.map { t in
+        var f = FXSettings()
+        f.type = t
+        switch t {
+        case .filter: f.a = 0.5; f.b = 0.3
+        case .delay: f.a = 0.35; f.b = 0.4
+        case .reverb: f.a = 0.35; f.b = 0.45
+        case .crusher: f.a = 0.6; f.b = 0.4
+        case .tapeStop: f.a = 1; f.b = 0.35
+        }
+        return f
+    }
+
+    init() {}
+
+    subscript(_ t: FXType) -> FXSettings {
+        get { effects.first { $0.type == t } ?? FXSettings() }
+        set {
+            if let i = effects.firstIndex(where: { $0.type == t }) { effects[i] = newValue } else { effects.append(newValue) }
+        }
+    }
+
+    var activeCount: Int { effects.filter { $0.on }.count }
+
+    enum CodingKeys: String, CodingKey { case on, effects }
+
+    init(from decoder: Decoder) throws {
+        self.init()
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        on = (try? c.decode(Bool.self, forKey: .on)) ?? true
+        if let list = try? c.decode([FXSettings].self, forKey: .effects) {
+            for f in list { self[f.type] = f }
+        }
+    }
+
+    /// Settings saved by 2.0 beta 10 / 11 held one effect per slot.
+    init(single f: FXSettings) {
+        self.init()
+        self[f.type] = f
+    }
+}
+
+/// Order in which the chain processes the effects.
+let fxChainOrder: [FXType] = [.filter, .crusher, .delay, .reverb, .tapeStop]
+
+/// Input or loop effect chain (audio thread).
+final class FXChain {
+    var on = true
+    let units: [FXUnit]
+
+    init(sampleRate: Double) {
+        units = fxChainOrder.map { FXUnit(sampleRate: sampleRate, type: $0) }
+    }
+
+    var tempo: Double = 120 {
+        didSet { for u in units { u.tempo = tempo } }
+    }
+
+    func unit(_ t: FXType) -> FXUnit? { units.first { $0.type == t } }
+
+    @inline(__always) func process(_ l: Float, _ r: Float) -> (Float, Float) {
+        var x = (l, r)
+        var i = 0
+        let n = units.count
+        while i < n {
+            let u = units[i]
+            x = u.process(x.0, x.1, bypass: !on)
+            i += 1
+        }
+        return x
+    }
+}
+
+/// One realtime effect. Parameters are plain properties written by the UI thread.
 /// No allocation after init.
 final class FXUnit {
     var on = false
-    var type: FXType = .filter
+    let type: FXType
     var a: Float = 0.5
     var b: Float = 0.3
     var delayBeats: Double = 0.75
@@ -129,16 +206,17 @@ final class FXUnit {
     private var tsSpeed: Double = 1
     private var tsWasOn = false
 
-    init(sampleRate: Double) {
+    init(sampleRate: Double, type t: FXType = .filter) {
+        type = t
         sr = sampleRate
         mixStep = Float(1.0 / (0.02 * sampleRate))
-        let dl = Int(sampleRate * 4.2)
+        let dl = t == .delay ? Int(sampleRate * 4.2) : 8
         dlLen = dl
         dlL = .allocate(capacity: dl)
         dlL.initialize(repeating: 0, count: dl)
         dlR = .allocate(capacity: dl)
         dlR.initialize(repeating: 0, count: dl)
-        let ts = Int(sampleRate * 6)
+        let ts = t == .tapeStop ? Int(sampleRate * 6) : 8
         tsLen = ts
         tsL = .allocate(capacity: ts)
         tsL.initialize(repeating: 0, count: ts)
@@ -147,8 +225,8 @@ final class FXUnit {
         room = RoomReverb(sampleRate: sampleRate)
     }
 
-    @inline(__always) func process(_ l: Float, _ r: Float) -> (Float, Float) {
-        let target: Float = on ? 1 : 0
+    @inline(__always) func process(_ l: Float, _ r: Float, bypass: Bool = false) -> (Float, Float) {
+        let target: Float = on && !bypass ? 1 : 0
         if mix < target { mix = min(target, mix + mixStep) } else if mix > target { mix = max(target, mix - mixStep) }
         if mix == 0 && type != .tapeStop {
             if type == .delay { writeDelay(l * 0, r * 0) }     // let the echo buffer drain silently
@@ -259,7 +337,7 @@ final class FXUnit {
         tsWasOn = on
         tsWrite += 1
         if tsWrite >= tsLen { tsWrite = 0 }
-        guard on else { return (l, r) }
+        guard on && mix > 0 else { return (l, r) }
         let time = 0.15 + Double(b) * 2.5
         tsSpeed = max(0, tsSpeed - 1 / (time * sr))
         tsRead += tsSpeed

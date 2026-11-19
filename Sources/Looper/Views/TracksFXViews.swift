@@ -274,102 +274,117 @@ private struct LevelSlider: View {
 
 // MARK: - Effects
 
-/// The Effects window (menu Effects › Effects…).
+/// The Effects window (menu Effects › Effects…): input and loop chains side by side.
 struct EffectsWindow: View {
     @EnvironmentObject var looper: LooperController
 
     var body: some View {
-        EffectsPanel()
-            .padding(14)
-            .frame(width: 720)
-            .background(ThemeBackground(theme: looper.appTheme, stateColor: UI.state(looper.snapshot.state), live: false))
-            .foregroundColor(UI.text)
-            .preferredColorScheme(UI.light ? .light : .dark)
-            .tint(UI.rhythm)
-            .id(looper.appTheme)
-    }
-}
-
-struct EffectsPanel: View {
-    @EnvironmentObject var looper: LooperController
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Effects").font(.system(size: 14, weight: .bold))
-                Text("Input FX are recorded with your playing; loop FX change the playback only.")
-                    .font(.system(size: 11)).foregroundColor(UI.muted)
-                Spacer()
-            }
-            HStack(alignment: .top, spacing: 12) {
-                FXSlotView(title: "Input FX", fx: Binding(get: { looper.settings.inputFX }, set: { looper.settings.inputFX = $0 }))
-                FXSlotView(title: "Loop FX", fx: Binding(get: { looper.settings.loopFX }, set: { looper.settings.loopFX = $0 }))
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Input FX are recorded with your playing; Loop FX change the playback only. Switch on as many effects as you like.")
+                .font(.system(size: 11.5))
+                .foregroundColor(UI.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .top, spacing: 14) {
+                FXChainView(title: "Input FX", chain: Binding(get: { looper.settings.inputFX }, set: { looper.settings.inputFX = $0 }))
+                FXChainView(title: "Loop FX", chain: Binding(get: { looper.settings.loopFX }, set: { looper.settings.loopFX = $0 }))
             }
         }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 14).fill(UI.panel))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(UI.line, lineWidth: 1))
+        .padding(18)
+        .frame(width: 940)
+        .fixedSize()
+        .background(ThemeBackground(theme: looper.appTheme, stateColor: UI.state(looper.snapshot.state), live: false))
+        .foregroundColor(UI.text)
+        .preferredColorScheme(UI.light ? .light : .dark)
+        .tint(UI.rhythm)
+        .id(looper.appTheme)
     }
 }
 
-private struct FXSlotView: View {
+private struct FXChainView: View {
     let title: String
-    @Binding var fx: FXSettings
+    @Binding var chain: FXChainSettings
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
-                Button { fx.on.toggle() } label: {
-                    HStack(spacing: 6) {
-                        Circle().fill(fx.on ? UI.rhythm : UI.track).frame(width: 9, height: 9)
-                            .shadow(color: fx.on ? UI.rhythm : .clear, radius: 4)
-                        Text(fx.type == .tapeStop ? (fx.on ? "Stopped" : "Stop tape") : (fx.on ? "On" : "Off"))
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .padding(.horizontal, 10)
-                    .frame(height: 28)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(fx.on ? UI.rhythm.opacity(0.2) : UI.well))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(fx.on ? UI.rhythm : UI.line2, lineWidth: 1))
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                Text(title).font(.system(size: 12.5, weight: .bold))
+                Text(title).font(.system(size: 14, weight: .bold))
+                Text("\(chain.activeCount) on").font(.system(size: 11)).foregroundColor(UI.muted)
                 Spacer()
-                Picker("", selection: $fx.type) {
-                    ForEach(FXType.allCases) { Label($0.label, systemImage: $0.symbol).tag($0) }
-                }
-                .labelsHidden()
-                .frame(width: 150)
+                Toggle("Chain", isOn: $chain.on)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .help("Bypass the whole \(title) chain")
             }
-            HStack(spacing: 14) {
-                knob(fx.type.knobs.0, value: $fx.a)
-                knob(fx.type.knobs.1, value: $fx.b)
-                if fx.type == .delay {
-                    Picker("", selection: $fx.time) {
-                        ForEach(DelayTime.allCases) { Text($0.label).tag($0) }
-                    }
-                    .labelsHidden()
-                    .frame(width: 80)
-                }
-            }
-            if fx.type == .filter {
-                Text("Cutoff: centre = open, left = low-pass, right = high-pass")
-                    .font(.system(size: 10.5)).foregroundColor(UI.muted)
-            } else if fx.type == .tapeStop {
-                Text("Switch on to slow the sound down to a halt, off to bring it back")
-                    .font(.system(size: 10.5)).foregroundColor(UI.muted)
+            ForEach(fxChainOrder) { t in
+                FXRow(fx: Binding(get: { chain[t] }, set: { chain[t] = $0 }), dimmed: !chain.on)
             }
         }
         .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 11).fill(UI.well))
-        .overlay(RoundedRectangle(cornerRadius: 11).stroke(fx.on ? UI.rhythm.opacity(0.6) : UI.line, lineWidth: 1))
+        .frame(width: 445, alignment: .topLeading)
+        .background(RoundedRectangle(cornerRadius: 12).fill(UI.panel))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(UI.line, lineWidth: 1))
+    }
+}
+
+private struct FXRow: View {
+    @Binding var fx: FXSettings
+    let dimmed: Bool
+
+    var body: some View {
+        let t = fx.type
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Button { fx.on.toggle() } label: {
+                    HStack(spacing: 7) {
+                        Circle().fill(fx.on ? UI.rhythm : UI.track).frame(width: 8, height: 8)
+                            .shadow(color: fx.on ? UI.rhythm : .clear, radius: 4)
+                        Image(systemName: t.symbol).font(.system(size: 11))
+                        Text(t == .tapeStop ? (fx.on ? "Tape stopped" : "Tape stop") : t.label)
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .frame(width: 128, height: 26, alignment: .leading)
+                    .padding(.horizontal, 8)
+                    .background(RoundedRectangle(cornerRadius: 7).fill(fx.on ? UI.rhythm.opacity(0.2) : UI.well))
+                    .overlay(RoundedRectangle(cornerRadius: 7).stroke(fx.on ? UI.rhythm : UI.line2, lineWidth: 1))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                knob(t.knobs.0, $fx.a)
+                knob(t.knobs.1, $fx.b)
+            }
+            if t == .delay {
+                HStack(spacing: 8) {
+                    Text("Time").font(.system(size: 10.5)).foregroundColor(UI.muted).frame(width: 144, alignment: .trailing)
+                    Picker("", selection: $fx.time) {
+                        ForEach(DelayTime.allCases) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 250)
+                }
+            }
+        }
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 9).fill(UI.well.opacity(fx.on ? 1 : 0.5)))
+        .opacity(dimmed ? 0.5 : 1)
+        .help(help(t))
     }
 
-    private func knob(_ name: String, value: Binding<Double>) -> some View {
-        HStack(spacing: 6) {
-            Text(name).font(.system(size: 11)).foregroundColor(UI.muted).frame(width: 64, alignment: .leading)
-            Slider(value: value, in: 0...1).frame(minWidth: 90)
+    private func knob(_ name: String, _ value: Binding<Double>) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(name).font(.system(size: 10)).foregroundColor(UI.muted)
+            Slider(value: value, in: 0...1).controlSize(.small)
+        }
+        .frame(width: 120)
+    }
+
+    private func help(_ t: FXType) -> String {
+        switch t {
+        case .filter: return "Cutoff: centre = open, left = low-pass, right = high-pass"
+        case .delay: return "Tempo-synced ping-pong delay"
+        case .reverb: return "Room to hall reverb"
+        case .crusher: return "Lower bit depth and sample rate"
+        case .tapeStop: return "Switch on to slow the sound down to a halt, off to bring it back"
         }
     }
 }

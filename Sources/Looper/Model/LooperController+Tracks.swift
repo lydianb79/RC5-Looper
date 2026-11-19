@@ -172,6 +172,6 @@ extension LooperController {
     func toggleFX(input: Bool) {
         if input { settings.inputFX.on.toggle() } else { settings.loopFX.on.toggle() }
         let f = input ? settings.inputFX : settings.loopFX
-        flash("\(input ? "Input" : "Loop") FX \(f.type.label) \(f.on ? "ON" : "OFF")")
+        flash("\(input ? "Input" : "Loop") FX \(f.on ? "ON" : "BYPASSED") · \(f.activeCount) active")
     }
 }

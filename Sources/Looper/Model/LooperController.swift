@@ -19,7 +19,7 @@ enum SideTab: String, CaseIterable, Identifiable {
 
 /// Main-thread brain of the app: pedal logic, memories, settings, MIDI, UI snapshot.
 final class LooperController: ObservableObject {
-    static let version = "2.0-beta.11"
+    static let version = "2.0-beta.12"
     #if arch(arm64)
     static let architecture = "Apple silicon (arm64)"
     #else
@@ -342,12 +342,15 @@ final class LooperController: ObservableObject {
         Self.apply(settings.loopFX, to: c.loopFX)
     }
 
-    static func apply(_ f: FXSettings, to u: FXUnit) {
-        u.type = f.type
-        u.a = Float(f.a)
-        u.b = Float(f.b)
-        u.delayBeats = f.time.beats
-        u.on = f.on
+    static func apply(_ ch: FXChainSettings, to chain: FXChain) {
+        chain.on = ch.on
+        for u in chain.units {
+            let f = ch[u.type]
+            u.a = Float(f.a)
+            u.b = Float(f.b)
+            u.delayBeats = f.time.beats
+            u.on = f.on
+        }
     }
 
     private func applyGlobals() {

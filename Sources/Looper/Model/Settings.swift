@@ -87,8 +87,8 @@ struct MemorySettings: Codable, Equatable {
     var stretchMode = StretchMode.keepPitch
     var loopMeasures = 0
     var trackLevels: [Double] = [1, 1]   // tracks 2 and 3
-    var inputFX = FXSettings()
-    var loopFX = FXSettings()
+    var inputFX = FXChainSettings()
+    var loopFX = FXChainSettings()
     var countInBars = 1          // 1 or 2 bars
     var clickMode = 0            // rhythm off: 0 click only for the count-in, 1 also while recording, 2 always
     var loopLength = 0           // fixed loop length in bars (0 = none: you close the loop yourself)
@@ -145,8 +145,17 @@ extension MemorySettings {
         countInBars = v(.countInBars, countInBars)
         trackLevels = v(.trackLevels, trackLevels)
         if trackLevels.count < 2 { trackLevels += Array(repeating: 1, count: 2 - trackLevels.count) }
-        inputFX = v(.inputFX, inputFX)
-        loopFX = v(.loopFX, loopFX)
+        func chain(_ key: CodingKeys) -> FXChainSettings? {
+            guard c.contains(key) else { return nil }
+            if let nested = try? c.nestedContainer(keyedBy: FXChainSettings.CodingKeys.self, forKey: key), nested.contains(.effects) {
+                return try? c.decode(FXChainSettings.self, forKey: key)
+            }
+            // 2.0 beta 10 / 11 stored a single effect per slot
+            if let single = try? c.decode(FXSettings.self, forKey: key) { return FXChainSettings(single: single) }
+            return nil
+        }
+        inputFX = chain(.inputFX) ?? inputFX
+        loopFX = chain(.loopFX) ?? loopFX
         clickMode = v(.clickMode, clickMode)
         savedSeconds = v(.savedSeconds, savedSeconds)
         thumb = v(.thumb, thumb)

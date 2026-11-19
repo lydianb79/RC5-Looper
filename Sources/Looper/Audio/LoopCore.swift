@@ -58,8 +58,8 @@ final class LoopCore {
     let stack: LayerStack
     let sub1: SubTrack
     let sub2: SubTrack
-    let inputFX: FXUnit
-    let loopFX: FXUnit
+    let inputFX: FXChain
+    let loopFX: FXChain
     var baseL: UnsafeMutablePointer<Float> { stack.baseL }
     var baseR: UnsafeMutablePointer<Float> { stack.baseR }
     func sub(_ t: Int) -> SubTrack { t == 0 ? sub1 : sub2 }
@@ -209,8 +209,8 @@ final class LoopCore {
         stack = LayerStack(capacity: cap)
         sub1 = SubTrack(capacity: cap, sampleRate: sampleRate)
         sub2 = SubTrack(capacity: cap, sampleRate: sampleRate)
-        inputFX = FXUnit(sampleRate: sampleRate)
-        loopFX = FXUnit(sampleRate: sampleRate)
+        inputFX = FXChain(sampleRate: sampleRate)
+        loopFX = FXChain(sampleRate: sampleRate)
         muteStep = Float(1.0 / (0.012 * sampleRate))
         ringL = buffer(1 << 15); ringR = buffer(1 << 15)
         ringMask = (1 << 15) - 1
@@ -917,8 +917,8 @@ final class LoopCore {
         }
         if sub1.stack.hasJobs { sub1.stack.processJobs(budget: 1 << 16) }
         if sub2.stack.hasJobs { sub2.stack.processJobs(budget: 1 << 16) }
-        inputFX.tempo = tempo
-        loopFX.tempo = tempo
+        if inputFX.tempo != tempo { inputFX.tempo = tempo }
+        if loopFX.tempo != tempo { loopFX.tempo = tempo }
         rhythm.configure(tempo: tempo, pattern: patternIndex, variation: variation, kit: kitIndex, reverb: reverbLevel, humanize: humanize)
         if !rhythmOn && rhythmPreview { rhythmPreview = false }
 
