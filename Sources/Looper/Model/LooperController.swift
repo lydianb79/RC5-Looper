@@ -201,6 +201,7 @@ final class LooperController: ObservableObject {
         let lastSlot = d.integer(forKey: "lastMemory")
         memoryIndex = max(0, min(MemoryStore.slotCount - 1, lastSlot))
         settings = store.loadSettings(memoryIndex) ?? MemorySettings.defaults(for: memoryIndex)
+        if !store.hasAudio(memoryIndex) { settings.tempo = 100 }   // a fresh start is always at 100 BPM
         applySettings()          // property observers don't fire inside init
         UI.theme = appTheme
         applyGlobals()

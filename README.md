@@ -80,14 +80,14 @@ Looper turns your Mac and an audio interface into a loop station. Record a phras
 
 | Area | What it does |
 |---|---|
-| **Toolbar** | Transport (record, play, stop), the display (state, bar.beat, time, tempo – click the BPM to type a tempo), Tap, Rhythm and Count-in switches, loop length, input meter, theme. |
+| **Toolbar** | Transport (record, play, stop), the display (state, bar.beat, time, tempo – click the BPM to type a tempo –, time signature and loop length – click it to choose FREE or 1–32 bars), Tap, input meter, theme. |
 | **Sidebar** | *Memories* (99 slots; double-click to rename, right-click for more) or *Song* (song mode steps). |
 | **Ring** | The loop as a circular waveform with the play head, bar ticks and the current bar.beat. |
 | **Track lanes** | Track 1 with its overdubs, tracks 2–5 with record / overdub / play buttons, undo, redo, clear, mute and level. |
 | **Buttons** | **Record** (only records: start, or close the loop), Play/Stop, Overdub, Clear, Undo, Redo, ×2, Mute, Fade out, beat lights. |
-| **Rhythm** | On/off, play, pattern and kit, A/B, **Edit pattern** (the pattern designer), Feel, Room and Level; the style buttons with the Intro / Ending / Count-in options next to them; the step grid. |
+| **Rhythm** | On/off, play, pattern and kit, A/B, **Edit pattern** (the pattern designer) with the Intro / Ending / Count-in options; the style buttons with Feel, Room and Level; the step grid. |
 
-Everything fits in one window without scrolling (minimum 1180 × 800). Hide the sidebar (⌃⌘S) or the rhythm panel (⌃⌘R) for more room. The **Effects** window opens from the Effects menu (⌥⌘F), all settings are in **Settings** (⌘,).
+Everything fits in one window without scrolling (minimum 1180 × 800); the track lanes and the step grid grow with the window. Hide the sidebar (⌃⌘S) or the rhythm panel (⌃⌘R) for more room. The **Effects** window opens from the Effects menu (⌥⌘F), all settings are in **Settings** (⌘,).
 
 ---
 

@@ -190,11 +190,6 @@ private struct StudioHeader: View {
 
             Spacer(minLength: 16)
 
-            HStack(spacing: 6) {
-                PillToggle(title: "Rhythm", symbol: "metronome", isOn: looper.settings.rhythmOn) { looper.toggleRhythm() }
-                PillToggle(title: "Count-in", symbol: nil, isOn: looper.settings.countIn) { looper.settings.countIn.toggle() }
-                LoopLengthMenu()
-            }
             InputMeter()
             Menu {
                 ForEach(AppTheme.allCases) { t in
@@ -266,6 +261,22 @@ private struct LCDView: View {
                 .font(.system(size: 14, weight: .medium, design: .monospaced))
                 .foregroundColor(UI.text2)
                 .padding(.horizontal, 12)
+            divider
+            Menu {
+                ForEach(LoopLengthOptions.bars, id: \.self) { b in
+                    Button((b == looper.settings.loopLength ? "✓ " : "") + LoopLengthOptions.label(b)) { looper.settings.loopLength = b }
+                    if b == 0 { Divider() }
+                }
+            } label: {
+                Text(looper.settings.loopLength == 0 ? "FREE" : "\(looper.settings.loopLength) BAR\(looper.settings.loopLength == 1 ? "" : "S")")
+                    .font(.system(size: 14, weight: .medium, design: .monospaced))
+                    .foregroundColor(looper.settings.loopLength == 0 ? UI.text2 : UI.rhythm)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .padding(.horizontal, 12)
+            .help("Loop length: recording stops by itself after this many bars (FREE = you close the loop yourself)")
         }
         .frame(height: 42)
         .background(RoundedRectangle(cornerRadius: 10).fill(UI.lcd))
@@ -525,17 +536,49 @@ private struct StageView: View {
     @EnvironmentObject var looper: LooperController
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            TitleRow()
-            HStack(alignment: .center, spacing: 20) {
-                HeroRing().frame(width: 262, height: 262)
-                TrackLanesView()
+        GeometryReader { geo in
+            let m = metrics(height: geo.size.height)
+            VStack(alignment: .leading, spacing: 14) {
+                TitleRow()
+                HStack(alignment: .center, spacing: 20) {
+                    HeroRing().frame(width: m.ring, height: m.ring)
+                    TrackLanesView(laneHeight: m.lane)
+                }
+                ControlRow()
+                if looper.showRhythm { RhythmPanel(cellHeight: m.cell).transition(.opacity) }
             }
-            ControlRow()
-            if looper.showRhythm { RhythmPanel().transition(.opacity) }
-            Spacer(minLength: 0)
+            .frame(maxWidth: 1400, maxHeight: .infinity, alignment: .topLeading)
         }
-        .frame(maxWidth: 1400, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    /// Splits the window height between the track lanes and the rhythm grid, so the
+    /// window is filled without scrolling at any size.
+    private func metrics(height h: CGFloat) -> (lane: CGFloat, ring: CGFloat, cell: CGFloat) {
+        let lanes = CGFloat(1 + LoopCore.subCount)
+        let laneGaps = (lanes - 1) * 6
+        let fixed: CGFloat = 32 + 56 + 14 * 3                      // title, buttons, spacing
+        let rhythmChrome: CGFloat = looper.showRhythm ? 14 * 2 + 30 + 30 + 10 * 2 + (looper.editingPattern ? 26 : 0) : 0
+        let rows = CGFloat(looper.showRhythm ? gridRows() : 0)
+        let available = max(200, h - fixed - rhythmChrome)
+        // the lanes get up to 58 % of the free height, the grid the rest
+        let laneShare = looper.showRhythm ? available * 0.58 : available
+        let lane = max(44, min(looper.showRhythm ? 86 : 110, (laneShare - laneGaps) / lanes))
+        let lanesTotal = lane * lanes + laneGaps
+        var cell: CGFloat = 16
+        if rows > 0 {
+            cell = max(13, min(30, (available - lanesTotal - rows * 3) / rows))
+        }
+        return (lane, min(lanesTotal, 340), cell)
+    }
+
+    private func gridRows() -> Int {
+        if looper.editingPattern { return kInstrumentCount }
+        let pi = looper.settings.rhythmPattern
+        let steps = max(1, min(kMaxSteps, RhythmLibrary.pattern(pi).steps))
+        return max(1, (0..<kInstrumentCount).filter { d in
+            (0..<steps).contains { looper.core.rhythm.cell(pattern: pi, variation: 0, drum: d, step: $0) > 0 ||
+                looper.core.rhythm.cell(pattern: pi, variation: 1, drum: d, step: $0) > 0 }
+        }.count)
     }
 }
 
@@ -832,6 +875,8 @@ private struct RhythmPanel: View {
 
     private static let drumNames = ["Kick", "Snare", "Hi-hat", "Open hat", "Ride", "Crash", "Tom hi", "Tom lo", "Rim", "Clap", "Shaker"]
 
+    var cellHeight: CGFloat = 16
+
     var body: some View {
         let s = looper.settings
         let pattern = RhythmLibrary.pattern(s.rhythmPattern)
@@ -899,20 +944,19 @@ private struct RhythmPanel: View {
                 .buttonStyle(.plain)
                 .fixedSize()
                 .help("Pattern designer: click steps to cycle accent → normal → ghost → off. Built-in patterns are copied to your User patterns first.")
+                Rectangle().fill(UI.line2).frame(width: 1, height: 20)
+                HStack(spacing: 14) {
+                    Toggle("Intro", isOn: $looper.settings.rhythmIntro)
+                        .help("One bar count + fill before recording starts")
+                    Toggle("Ending", isOn: $looper.settings.rhythmEnding)
+                        .help("Stop plays a fill and a final hit on the next bar line")
+                    Toggle("Count-in", isOn: $looper.settings.countIn)
+                        .help("Count before recording (metronome clicks when the rhythm is off)")
+                }
+                .toggleStyle(.checkbox)
+                .font(.system(size: 12))
+                .fixedSize()
                 Spacer(minLength: 8)
-                HStack(spacing: 5) {
-                    Text("Feel").font(.system(size: 11)).foregroundColor(UI.muted)
-                    Slider(value: $looper.settings.rhythmHumanize, in: 0...1).frame(width: 70)
-                        .help("Humanize: 0 = rigid drum machine, right = a drummer's natural timing and dynamics")
-                }
-                HStack(spacing: 5) {
-                    Text("Room").font(.system(size: 11)).foregroundColor(UI.muted)
-                    Slider(value: $looper.settings.rhythmReverb, in: 0...1).frame(width: 60)
-                }
-                HStack(spacing: 5) {
-                    Text("Level").font(.system(size: 11)).foregroundColor(UI.muted)
-                    Slider(value: $looper.settings.rhythmLevel, in: 0...2).frame(width: 80)
-                }
             }
             HStack(spacing: 10) {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -929,17 +973,19 @@ private struct RhythmPanel: View {
                     .padding(.vertical, 2)
                 }
                 Rectangle().fill(UI.line2).frame(width: 1, height: 20)
-                HStack(spacing: 14) {
-                    Toggle("Intro", isOn: $looper.settings.rhythmIntro)
-                        .help("One bar count + fill before recording starts")
-                    Toggle("Ending", isOn: $looper.settings.rhythmEnding)
-                        .help("Stop plays a fill and a final hit on the next bar line")
-                    Toggle("Count-in", isOn: $looper.settings.countIn)
-                        .help("Count before recording (metronome clicks when the rhythm is off)")
+                HStack(spacing: 5) {
+                    Text("Feel").font(.system(size: 11)).foregroundColor(UI.muted)
+                    Slider(value: $looper.settings.rhythmHumanize, in: 0...1).frame(width: 70)
+                        .help("Humanize: 0 = rigid drum machine, right = a drummer's natural timing and dynamics")
                 }
-                .toggleStyle(.checkbox)
-                .font(.system(size: 12))
-                .fixedSize()
+                HStack(spacing: 5) {
+                    Text("Room").font(.system(size: 11)).foregroundColor(UI.muted)
+                    Slider(value: $looper.settings.rhythmReverb, in: 0...1).frame(width: 60)
+                }
+                HStack(spacing: 5) {
+                    Text("Level").font(.system(size: 11)).foregroundColor(UI.muted)
+                    Slider(value: $looper.settings.rhythmLevel, in: 0...2).frame(width: 80)
+                }
             }
             if looper.editingPattern {
                 Text(looper.currentIsUserPattern
@@ -950,7 +996,8 @@ private struct RhythmPanel: View {
             }
             StepGrid(pattern: s.rhythmPattern, variation: s.rhythmVariation, on: s.rhythmOn,
                      step: looper.snapshot.rhythmStep, names: Self.drumNames, core: looper.core,
-                     editing: looper.editingPattern, version: looper.patternsVersion) { d, i in looper.toggleCell(drum: d, step: i) }
+                     editing: looper.editingPattern, version: looper.patternsVersion,
+                     cellHeight: cellHeight) { d, i in looper.toggleCell(drum: d, step: i) }
         }
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 14).fill(UI.panel))
@@ -967,6 +1014,7 @@ private struct StepGrid: View {
     let core: LoopCore
     var editing = false
     var version = 0
+    var cellHeight: CGFloat = 16
     var onTap: (Int, Int) -> Void = { _, _ in }
 
     var body: some View {
@@ -1004,7 +1052,7 @@ private struct StepGrid: View {
             : (i % spb == 0 ? UI.well : UI.wellAlt)
         RoundedRectangle(cornerRadius: 5)
             .fill(current && hit ? Color.white : base)
-            .frame(height: editing ? 13 : 16)
+            .frame(height: cellHeight)
             .overlay(RoundedRectangle(cornerRadius: 5).stroke(current ? (hit ? Color.white : UI.dim) : (editing ? UI.line2 : Color.clear), lineWidth: current ? 2 : 1))
             .shadow(color: current && hit ? UI.base : .clear, radius: 6)
     }
@@ -1079,43 +1127,6 @@ private struct TransportButton: View {
         .buttonStyle(.plain)
         .help(help)
         .accessibilityLabel(help)
-    }
-}
-
-/// Toolbar menu for the fixed loop length ("Length: None / 4 bars").
-private struct LoopLengthMenu: View {
-    @EnvironmentObject var looper: LooperController
-
-    var body: some View {
-        let bars = looper.settings.loopLength
-        let on = bars > 0
-        Menu {
-            ForEach(LoopLengthOptions.bars, id: \.self) { b in
-                Button {
-                    looper.settings.loopLength = b
-                } label: {
-                    if b == bars { Label(LoopLengthOptions.label(b), systemImage: "checkmark") } else { Text(LoopLengthOptions.label(b)) }
-                }
-                if b == 0 { Divider() }
-            }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "ruler")
-                Text(on ? LoopLengthOptions.label(bars) : "Length")
-                Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
-            }
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundColor(on ? (UI.light ? UI.rhythm : .white) : UI.text2)
-            .padding(.horizontal, 11)
-            .frame(height: 30)
-            .background(RoundedRectangle(cornerRadius: 8).fill(on ? UI.rhythm.opacity(0.28) : UI.control))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(on ? UI.rhythm : UI.line2, lineWidth: 1))
-            .contentShape(Rectangle())
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help("Loop length: recording stops by itself after this many bars (None = close the loop yourself)")
     }
 }
 

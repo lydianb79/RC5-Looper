@@ -82,7 +82,7 @@ struct MemorySettings: Codable, Equatable {
     var rhythmHumanize = 0.6     // 0 = quantized machine, 1 = loose human feel
     var rhythmIntro = false      // one-bar intro (count + fill) before recording
     var rhythmEnding = false     // fill + final hit when stopping
-    var tempo = 120.0
+    var tempo = 100.0
     var loopTempo = 0.0          // tempo the loop audio was recorded at (0 = same as tempo)
     var stretchMode = StretchMode.keepPitch
     var loopMeasures = 0
@@ -183,7 +183,7 @@ struct Snapshot: Equatable {
     var waitingQuantize = false
     var stopping = false
     var rhythmRunning = false
-    var tempo: Double = 120
+    var tempo: Double = 100
     var loopTempo: Double = 0
     var playbackRate: Double = 1
     var hasDubLayer = false       // an undoable overdub layer exists
