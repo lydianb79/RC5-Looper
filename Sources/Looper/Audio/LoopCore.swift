@@ -953,11 +953,9 @@ final class LoopCore {
                 inR = ringR[ringRead & ringMask]
                 ringRead += 1
             }
-            if inputFX.on || inputFX.type == .tapeStop {
-                let fx = inputFX.process(inL, inR)
-                inL = fx.0
-                inR = fx.1
-            }
+            let ifx = inputFX.process(inL, inR)
+            inL = ifx.0
+            inR = ifx.1
             // track gains (smoothed mutes)
             if mainGain != mainTarget * lvl {
                 let t = mainTarget * lvl
