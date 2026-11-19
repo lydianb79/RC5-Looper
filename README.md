@@ -8,7 +8,7 @@ Looper turns your Mac and an audio interface into a loop station. Record a phras
 
 ![Looper main window](docs/screenshot.png)
 
-*Version 2.0.1 · macOS 13 Ventura or later · Apple silicon and Intel · SwiftUI + AVAudioEngine, no third-party code*
+*Version 2.0.2 · macOS 13 Ventura or later · Apple silicon and Intel · SwiftUI + AVAudioEngine, no third-party code*
 
 ---
 
@@ -193,7 +193,8 @@ build_local.sh, Build Looper.command   local arm64 + x86_64 build
 
 | Version | Changes |
 |---|---|
-| **2.0.1** | Window layout fills the screen (taller track lanes and step grid); loop length shown next to the time signature; Intro / Ending / Count-in next to *Edit pattern*; starts at 100 BPM. |
+| **2.0.2** | The step grid stretches to the bottom of the window, track lanes grow when a pattern has few rows. |
+| 2.0.1 | Window layout fills the screen (taller track lanes and step grid); loop length shown next to the time signature; Intro / Ending / Count-in next to *Edit pattern*; starts at 100 BPM. |
 | 2.0 | New studio window that fits on one screen; five synced tracks; undo history (5 steps); ×2, mute and fade out; input and loop effects; song mode; mix and MIDI export; MIDI learn; pattern editor and ~50 new patterns; count-in length and metronome click; much more natural drums (more recordings, groove engine, room); fixed loop length; typed tempo entry; 20 themes; new icon; local build script for both architectures. |
 | 1.9 | Stereo input, About window with version, Help menu, count-in and intro also without rhythm. |
 | 1.8 | Rhythm intro, ending and fills; external MIDI clock; labelled arm64 / x86_64 builds. |
