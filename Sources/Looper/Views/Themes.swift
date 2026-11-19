@@ -679,8 +679,8 @@ private struct ThemeArt: View {
             }
 
         case .dunes:
-            let sunC = CGPoint(x: w * 0.3, y: h * 0.42)
-            ctx.fill(Path(ellipseIn: CGRect(x: sunC.x - 80, y: sunC.y - 80, width: 160, height: 160)), with: .color(p.artColor2.opacity(0.85)))
+            let sunC = CGPoint(x: w * 0.86, y: h * 0.5)
+            ctx.fill(Path(ellipseIn: CGRect(x: sunC.x - 80, y: sunC.y - 80, width: 160, height: 160)), with: .color(p.artColor2.opacity(0.7)))
             ctx.fill(Path(ellipseIn: CGRect(x: sunC.x - 300, y: sunC.y - 300, width: 600, height: 600)),
                      with: .radialGradient(Gradient(colors: [p.artColor2.opacity(0.3), .clear]), center: sunC, startRadius: 70, endRadius: 300))
             let dunes: [(CGFloat, Double, Double)] = [(0.6, 0.55, 0.0), (0.7, 0.75, 1.3), (0.82, 0.95, 2.6)]
