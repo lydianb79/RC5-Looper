@@ -21,14 +21,19 @@ enum UI {
     static var line: Color { theme.palette.line }
     static var rhythm: Color { theme.palette.accent }
     static var selection: Color { theme.palette.selection }
-    static let lcd = Color(hex: 0x0A0A0C)
-    static let line2 = Color(hex: 0x2E2E35)
-    static let control = Color(hex: 0x24242A)
-    static let controlHi = Color(hex: 0x2E2E35)
-    static let text = Color(hex: 0xF4F4F7)
-    static let text2 = Color(hex: 0xC7C7D1)
-    static let muted = Color(hex: 0x8E8E99)
-    static let base = Color(hex: 0x8EA2FF)
+    static var lcd: Color { theme.palette.lcd }
+    static var line2: Color { theme.palette.line2 }
+    static var control: Color { theme.palette.control }
+    static var controlHi: Color { theme.palette.controlHi }
+    static var well: Color { theme.palette.well }
+    static var wellAlt: Color { theme.palette.wellAlt }
+    static var track: Color { theme.palette.track }
+    static var dim: Color { theme.palette.dim }
+    static var text: Color { theme.palette.text }
+    static var text2: Color { theme.palette.text2 }
+    static var muted: Color { theme.palette.muted }
+    static var base: Color { theme.palette.base }
+    static var light: Bool { theme.palette.light }
     static let dub = Color(hex: 0xFFB340)
 
     static func state(_ s: LoopState) -> Color {
@@ -42,13 +47,7 @@ enum UI {
     }
 
     static func tint(_ s: LoopState) -> Color {
-        switch s {
-        case .recording, .armed, .autoRecArmed: return Color(hex: 0x341311)
-        case .overdubbing: return Color(hex: 0x33230C)
-        case .playing: return Color(hex: 0x0F2A18)
-        case .stopped: return Color(hex: 0x102530)
-        case .empty: return Color(hex: 0x1F1F25)
-        }
+        state(s).opacity(light ? 0.16 : 0.2)
     }
 
     static let mono = Font.system(size: 20, weight: .bold, design: .monospaced)
@@ -121,7 +120,7 @@ struct StudioView: View {
                                     live: snap.state == .playing || snap.state == .overdubbing || snap.state == .recording))
         .ignoresSafeArea(.container, edges: .top)
         .foregroundColor(UI.text)
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(UI.light ? .light : .dark)
         .tint(UI.rhythm)
         .animation(.easeInOut(duration: 0.2), value: looper.showSidebar)
         .animation(.easeInOut(duration: 0.2), value: looper.showRhythm)
@@ -270,7 +269,7 @@ private struct LCDView: View {
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(UI.line2, lineWidth: 1))
     }
 
-    private var divider: some View { Rectangle().fill(Color(hex: 0x222228)).frame(width: 1, height: 26) }
+    private var divider: some View { Rectangle().fill(UI.line2).frame(width: 1, height: 26) }
 
     private func stateWord(_ s: Snapshot) -> String {
         if s.state == .armed { return s.countdownBeats > 0 ? "COUNT \(s.countdownBeats)" : "WAIT" }
@@ -457,7 +456,7 @@ private struct MemoryRow: View {
         HStack(spacing: 10) {
             Text(String(format: "%02d", info.id + 1))
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundColor(selected ? Color(hex: 0x121215) : (empty ? UI.muted : UI.text))
+                .foregroundColor(selected ? (UI.light ? .white : Color(hex: 0x121215)) : (empty ? UI.muted : UI.text))
                 .frame(width: 28, height: 28)
                 .background(RoundedRectangle(cornerRadius: 8).fill(selected ? UI.base : UI.control))
             VStack(alignment: .leading, spacing: 4) {
@@ -468,7 +467,7 @@ private struct MemoryRow: View {
                 if empty {
                     Text("empty").font(.system(size: 11)).foregroundColor(UI.muted)
                 } else {
-                    ThumbView(values: thumb, color: selected ? .white : Color(hex: 0x6B6B78))
+                    ThumbView(values: thumb, color: selected ? .white : UI.dim)
                         .frame(height: 12)
                 }
             }
@@ -569,7 +568,7 @@ private struct Chip: View {
             .font(.system(size: 11.5))
             .foregroundColor(UI.text2)
             .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(RoundedRectangle(cornerRadius: 5).fill(Color(hex: 0x24242A)))
+            .background(RoundedRectangle(cornerRadius: 5).fill(UI.control))
     }
 }
 
@@ -639,7 +638,7 @@ private struct RingCanvas: View {
             let inner = outer * 0.64
             let barMax = outer - inner - 12
             ctx.stroke(Path(ellipseIn: CGRect(x: c.x - outer, y: c.y - outer, width: outer * 2, height: outer * 2)),
-                       with: .color(Color(hex: 0x24242A)), lineWidth: 10)
+                       with: .color(UI.well), lineWidth: 10)
             // radial waveform
             let n = 96
             if !wave.isEmpty {
@@ -653,7 +652,7 @@ private struct RingCanvas: View {
                     var p = Path()
                     p.move(to: CGPoint(x: c.x + CGFloat(cos(ang)) * inner, y: c.y + CGFloat(sin(ang)) * inner))
                     p.addLine(to: CGPoint(x: c.x + CGFloat(cos(ang)) * (inner + len), y: c.y + CGFloat(sin(ang)) * (inner + len)))
-                    ctx.stroke(p, with: .color(f <= position ? color : Color(hex: 0x3A3A44)), style: StrokeStyle(lineWidth: 2.4, lineCap: .round))
+                    ctx.stroke(p, with: .color(f <= position ? color : UI.track), style: StrokeStyle(lineWidth: 2.4, lineCap: .round))
                 }
             }
             // bar ticks
@@ -663,7 +662,7 @@ private struct RingCanvas: View {
                 var t = Path()
                 t.move(to: CGPoint(x: c.x + CGFloat(cos(ang)) * (outer + 8), y: c.y + CGFloat(sin(ang)) * (outer + 8)))
                 t.addLine(to: CGPoint(x: c.x + CGFloat(cos(ang)) * (outer + 15), y: c.y + CGFloat(sin(ang)) * (outer + 15)))
-                ctx.stroke(t, with: .color(Color(hex: 0x5A5A66)), lineWidth: 2)
+                ctx.stroke(t, with: .color(UI.dim), lineWidth: 2)
             }
             // progress arc
             if !empty && position > 0.001 {
@@ -751,7 +750,7 @@ private struct LaneView: View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 7) {
-                    RoundedRectangle(cornerRadius: 3).fill(dimmed ? Color(hex: 0x5A5A66) : color).frame(width: 9, height: 9)
+                    RoundedRectangle(cornerRadius: 3).fill(dimmed ? UI.dim : color).frame(width: 9, height: 9)
                     Text(title).font(.system(size: 12.5, weight: .semibold))
                 }
                 Text(meta).font(.system(size: 11)).foregroundColor(UI.muted).lineLimit(1)
@@ -761,7 +760,7 @@ private struct LaneView: View {
             Canvas { ctx, size in
                 let n = 120
                 guard !wave.isEmpty else {
-                    ctx.fill(Path(CGRect(x: 0, y: size.height / 2 - 1, width: size.width, height: 2)), with: .color(Color(hex: 0x2A2A31)))
+                    ctx.fill(Path(CGRect(x: 0, y: size.height / 2 - 1, width: size.width, height: 2)), with: .color(UI.track))
                     return
                 }
                 let w = size.width / CGFloat(n)
@@ -774,7 +773,7 @@ private struct LaneView: View {
                     let rect = CGRect(x: CGFloat(i) * w, y: (size.height - h) / 2, width: max(1, w - 1.5), height: h)
                     let near = glow && abs(f - position) < 0.02
                     let opacity = dimmed ? 0.35 : (near ? 1 : (f <= position ? 0.95 : 0.32))
-                    let col = dimmed ? Color(hex: 0x3A3A44) : color
+                    let col = dimmed ? UI.track : color
                     if near {
                         var g = ctx
                         g.addFilter(.shadow(color: col, radius: 5))
@@ -836,13 +835,13 @@ private struct PerformanceRow: View {
                         Text(looper.nextActionLabel).font(.system(size: 18, weight: .bold))
                         Text("hold 2 s: undo / clear  ·  double-press: stop")
                             .font(.system(size: 11.5))
-                            .foregroundColor(Color(hex: 0xB4B4BF))
+                            .foregroundColor(UI.text2)
                     }
                     Spacer(minLength: 8)
                     Text("R")
                         .font(.system(size: 12, weight: .medium))
                         .padding(.horizontal, 9).padding(.vertical, 4)
-                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color(hex: 0x4A4A55), lineWidth: 1))
+                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(UI.line2, lineWidth: 1))
                 }
                 .padding(.horizontal, 18)
                 .frame(width: 400, height: 66)
@@ -863,7 +862,7 @@ private struct PerformanceRow: View {
                 }
                 .padding(.horizontal, 16)
                 .frame(height: 52)
-                .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: 0x1F1F25)))
+                .background(RoundedRectangle(cornerRadius: 12).fill(UI.well))
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(UI.line2, lineWidth: 1))
                 .contentShape(Rectangle())
             }
@@ -918,7 +917,7 @@ private struct SecondaryLabel: View {
         }
         .padding(.horizontal, 16)
         .frame(height: 52)
-        .background(RoundedRectangle(cornerRadius: 12).fill(highlight.map { $0.opacity(0.15) } ?? Color(hex: 0x1F1F25)))
+        .background(RoundedRectangle(cornerRadius: 12).fill(highlight.map { $0.opacity(0.15) } ?? UI.well))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(highlight ?? UI.line2, lineWidth: 1))
         .scaleEffect(pressed ? 0.97 : 1)
         .contentShape(Rectangle())
@@ -936,7 +935,7 @@ private struct BeatLights: View {
                 let on = i + 1 == current
                 let col = i == 0 ? Color(hex: 0xFF453A) : color
                 Circle()
-                    .fill(on ? col : Color(hex: 0x2A2A31))
+                    .fill(on ? col : UI.track)
                     .frame(width: 14, height: 14)
                     .shadow(color: on ? col : .clear, radius: 7)
             }
@@ -1064,7 +1063,7 @@ private struct StepGrid: View {
                 HStack(spacing: 4) {
                     Text(names[d])
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(Color(hex: 0xA9A9B5))
+                        .foregroundColor(UI.text2)
                         .frame(width: 64, alignment: .leading)
                     ForEach(0..<steps, id: \.self) { i in
                         cell(d: d, i: i, spb: spb)
@@ -1080,12 +1079,12 @@ private struct StepGrid: View {
         let hit = v > 0
         let current = on && i == step
         let base: Color = hit
-            ? (on ? (v >= 0.9 ? UI.rhythm : (v >= 0.5 ? UI.rhythm.opacity(0.65) : UI.rhythm.opacity(0.38))) : Color(hex: 0x33333B))
-            : (i % spb == 0 ? Color(hex: 0x22222A) : Color(hex: 0x1C1C22))
+            ? (on ? (v >= 0.9 ? UI.rhythm : (v >= 0.5 ? UI.rhythm.opacity(0.65) : UI.rhythm.opacity(0.38))) : UI.track)
+            : (i % spb == 0 ? UI.well : UI.wellAlt)
         RoundedRectangle(cornerRadius: 5)
             .fill(current && hit ? Color.white : base)
             .frame(height: 22)
-            .overlay(RoundedRectangle(cornerRadius: 5).stroke(current ? (hit ? Color.white : Color(hex: 0x5A5A66)) : Color.clear, lineWidth: 2))
+            .overlay(RoundedRectangle(cornerRadius: 5).stroke(current ? (hit ? Color.white : UI.dim) : Color.clear, lineWidth: 2))
             .shadow(color: current && hit ? UI.base : .clear, radius: 6)
     }
 }
@@ -1190,7 +1189,7 @@ private struct LoopLengthMenu: View {
                 Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
             }
             .font(.system(size: 12, weight: .semibold))
-            .foregroundColor(on ? .white : UI.text2)
+            .foregroundColor(on ? (UI.light ? UI.rhythm : .white) : UI.text2)
             .padding(.horizontal, 11)
             .frame(height: 30)
             .background(RoundedRectangle(cornerRadius: 8).fill(on ? UI.rhythm.opacity(0.28) : UI.control))
@@ -1217,7 +1216,7 @@ private struct PillToggle: View {
                 Text(title)
             }
             .font(.system(size: 12, weight: .semibold))
-            .foregroundColor(isOn ? .white : UI.text2)
+            .foregroundColor(isOn ? (UI.light ? UI.rhythm : .white) : UI.text2)
             .padding(.horizontal, 11)
             .frame(height: 30)
             .background(RoundedRectangle(cornerRadius: 8).fill(isOn ? UI.rhythm.opacity(0.28) : UI.control))
@@ -1237,7 +1236,7 @@ private struct ToggleChip: View {
         Button { isOn.toggle() } label: {
             Text(title)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundColor(isOn ? Color(hex: 0xDDE3FF) : UI.text2)
+                .foregroundColor(isOn ? UI.text : UI.text2)
                 .padding(.horizontal, 10)
                 .frame(height: 26)
                 .background(RoundedRectangle(cornerRadius: 7).fill(isOn ? UI.rhythm.opacity(0.22) : Color.clear))
@@ -1254,10 +1253,10 @@ private struct ChipButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 12, weight: selected ? .semibold : .regular))
-            .foregroundColor(selected ? Color(hex: 0x121215) : UI.text2)
+            .foregroundColor(selected ? .white : UI.text2)
             .padding(.horizontal, 11)
             .frame(height: 26)
-            .background(Capsule().fill(selected ? UI.text : Color.clear))
+            .background(Capsule().fill(selected ? UI.rhythm : Color.clear))
             .overlay(Capsule().stroke(selected ? Color.clear : UI.line2, lineWidth: 1))
             .opacity(configuration.isPressed ? 0.7 : 1)
             .contentShape(Capsule())
