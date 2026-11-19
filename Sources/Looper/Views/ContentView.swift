@@ -1,104 +1,8 @@
 import SwiftUI
 
 struct ContentView: View {
-    @EnvironmentObject var looper: LooperController
-
     var body: some View {
-        let theme = Theme.of(looper.themeID)
-        let glow = StateColor.of(looper.snapshot.state, accent: theme.accent)
-        HStack(spacing: 0) {
-            ScrollView(.vertical, showsIndicators: false) {
-                PedalView()
-                    .frame(width: 500)
-                    .padding(24)
-            }
-            .frame(width: 548)
-            SidePanel()
-                .frame(minWidth: 460, maxWidth: .infinity)
-                .background(.ultraThinMaterial)
-                .overlay(alignment: .leading) {
-                    Rectangle().fill(Color.white.opacity(0.06)).frame(width: 1)
-                }
-        }
-        .background(
-            ZStack {
-                LinearGradient(colors: [Color(red: 0.07, green: 0.075, blue: 0.09), Color(red: 0.02, green: 0.02, blue: 0.03)],
-                               startPoint: .top, endPoint: .bottom)
-                RadialGradient(colors: [glow.opacity(0.25), .clear], center: .init(x: 0.22, y: 0.5), startRadius: 20, endRadius: 650)
-                    .animation(.easeInOut(duration: 0.5), value: looper.snapshot.state)
-            }
-            .ignoresSafeArea()
-        )
-        .preferredColorScheme(.dark)
-        .tint(theme.accent)
-        .alert("Unsaved loop", isPresented: Binding(get: { looper.pendingMemorySwitch != nil }, set: { _ in })) {
-            Button("Write, then Switch") { looper.writeThenSwitch() }
-            Button("Discard", role: .destructive) { looper.confirmSwitch() }
-            Button("Cancel", role: .cancel) { looper.cancelSwitch() }
-        } message: {
-            Text("Memory \(String(format: "%02d", looper.memoryIndex + 1)) has changes that haven't been written.")
-        }
-    }
-}
-
-struct SidePanel: View {
-    @EnvironmentObject var looper: LooperController
-
-    var body: some View {
-        VStack(spacing: 0) {
-            TabBar(selection: $looper.selectedTab, accent: Theme.of(looper.themeID).accent)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-            Rectangle().fill(Color.white.opacity(0.06)).frame(height: 1)
-            switch looper.selectedTab {
-            case .setup: SetupView()
-            case .audio: AudioSetupView()
-            case .rhythm: RhythmView()
-            case .memory: MemoryView()
-            case .help: HelpView()
-            }
-        }
-        .scrollContentBackground(.hidden)
-    }
-}
-
-/// Icon tab bar for the side panel.
-struct TabBar: View {
-    @Binding var selection: SideTab
-    var accent: Color
-    @Namespace private var ns
-
-    var body: some View {
-        HStack(spacing: 4) {
-            ForEach(SideTab.allCases) { tab in
-                let selected = tab == selection
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { selection = tab }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: tab.symbol)
-                        Text(tab.rawValue).lineLimit(1).minimumScaleFactor(0.8)
-                    }
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundColor(selected ? .black : .white.opacity(0.7))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .frame(maxWidth: .infinity)
-                    .background {
-                        if selected {
-                            Capsule().fill(accent)
-                                .shadow(color: accent.opacity(0.6), radius: 8)
-                                .matchedGeometryEffect(id: "tab", in: ns)
-                        }
-                    }
-                    .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(4)
-        .background(Capsule().fill(Color.black.opacity(0.35)))
-        .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))
+        StudioView()
     }
 }
 
@@ -152,12 +56,6 @@ struct SetupView: View {
                 }
                 Toggle("Input monitor (hear the input through the app)", isOn: $looper.inputMonitor)
                 LabeledContent("Input") { LevelMeter(level: looper.snapshot.inLevel).frame(width: 180) }
-            }
-            Section("Appearance") {
-                Picker("Theme", selection: $looper.themeID) {
-                    ForEach(ThemeID.allCases) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.segmented)
             }
             Section("MIDI") {
                 Picker("Tempo sync", selection: $looper.syncExternal) {

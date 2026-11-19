@@ -59,5 +59,7 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/*.zip --clobber
           else
-            gh release create "$TAG" dist/*.zip --target "$GITHUB_SHA" --title "Looper ${VERSION}" --notes "$NOTES"
+            PRE=""
+            if [[ "$VERSION" == *-* ]]; then PRE="--prerelease"; fi
+            gh release create "$TAG" dist/*.zip --target "$GITHUB_SHA" --title "Looper ${VERSION}" --notes "$NOTES" $PRE
           fi

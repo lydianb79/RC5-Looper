@@ -86,10 +86,11 @@ struct MemorySettings: Codable, Equatable {
     var stretchMode = StretchMode.keepPitch
     var loopMeasures = 0
     var savedSeconds = 0.0
+    var thumb: [Float] = []      // small waveform preview for the memory list
 
     enum CodingKeys: String, CodingKey {
         case name, recAction, dubMode, quantize, autoRec, countIn, startMode, stopMode, fadeSeconds
-        case oneShot, reverse, loopLevel, rhythmOn, rhythmPattern, rhythmVariation, rhythmKit
+        case thumb, oneShot, reverse, loopLevel, rhythmOn, rhythmPattern, rhythmVariation, rhythmKit
         case rhythmLevel, rhythmReverb, rhythmIntro, rhythmEnding, tempo, loopTempo, stretchMode, loopMeasures, savedSeconds
     }
 
@@ -133,6 +134,7 @@ extension MemorySettings {
         stretchMode = v(.stretchMode, stretchMode)
         loopMeasures = v(.loopMeasures, loopMeasures)
         savedSeconds = v(.savedSeconds, savedSeconds)
+        thumb = v(.thumb, thumb)
     }
 }
 
@@ -160,10 +162,17 @@ struct Snapshot: Equatable {
     var tempo: Double = 120
     var loopTempo: Double = 0
     var playbackRate: Double = 1
+    var hasDubLayer = false       // an undoable overdub layer exists
+    var dubActive = false         // …and is audible (not undone)
+    var rhythmStep = -1           // current step of the rhythm grid, -1 = not running
 }
 
 struct MemoryInfo: Identifiable, Equatable {
     let id: Int
     var name: String
     var seconds: Double?
+    var thumb: [Float] = []
+    var tempo: Double = 0
+    var bars = 0
+    var rhythm = false
 }

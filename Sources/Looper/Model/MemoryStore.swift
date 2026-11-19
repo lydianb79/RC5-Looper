@@ -37,7 +37,8 @@ final class MemoryStore {
         let s = loadSettings(i)
         let name = s?.name ?? MemorySettings.defaults(for: i).name
         let secs: Double? = hasAudio(i) ? (s?.savedSeconds ?? 0) : nil
-        return MemoryInfo(id: i, name: name, seconds: secs)
+        return MemoryInfo(id: i, name: name, seconds: secs, thumb: s?.thumb ?? [],
+                          tempo: s?.tempo ?? 0, bars: s?.loopMeasures ?? 0, rhythm: s?.rhythmOn ?? false)
     }
 
     func allInfo() -> [MemoryInfo] { (0..<Self.slotCount).map { info($0) } }

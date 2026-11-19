@@ -10,10 +10,16 @@ struct LooperApp: App {
         WindowGroup("Looper") {
             ContentView()
                 .environmentObject(looper)
-                .frame(minWidth: 1020, minHeight: 560)
+                .frame(minWidth: 1120, minHeight: 720)
         }
-        .defaultSize(width: 1140, height: 760)
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 1440, height: 920)
         .commands { LooperCommands(looper: looper) }
+
+        Settings {
+            SettingsView()
+                .environmentObject(looper)
+        }
     }
 }
 
@@ -53,7 +59,7 @@ struct LooperCommands: Commands {
             Button("About Looper") { LooperCommands.showAbout() }
         }
         CommandGroup(replacing: .help) {
-            Button("Looper Help & Shortcuts") { looper.selectedTab = .help }
+            SettingsButton(looper: looper, tab: .help) { Text("Looper Help & Shortcuts") }
                 .keyboardShortcut("?", modifiers: .command)
             Divider()
             Button("Release Notes (v\(LooperController.version))") {
@@ -63,15 +69,13 @@ struct LooperCommands: Commands {
                 if let url = URL(string: "https://github.com/lydianb79/RC5-Looper") { NSWorkspace.shared.open(url) }
             }
         }
-        CommandGroup(replacing: .appSettings) {
-            Button("Audio Devices…") { looper.selectedTab = .audio }
-                .keyboardShortcut(",", modifiers: .command)
+        CommandGroup(replacing: .undoRedo) {
+            Button("Undo / Redo Last Overdub") { looper.undoRedo() }
+                .keyboardShortcut("z", modifiers: .command)
         }
         CommandMenu("Looper") {
             Button("Rec / Play / Dub  (Space)") { looper.pedalTap() }
             Button("Stop  (Esc)") { looper.stop() }
-            Button("Undo / Redo Last Overdub") { looper.undoRedo() }
-                .keyboardShortcut("u", modifiers: .command)
             Button("Clear Loop") { looper.clear() }
                 .keyboardShortcut(.delete, modifiers: .command)
             Divider()

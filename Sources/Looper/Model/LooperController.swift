@@ -19,7 +19,7 @@ enum SideTab: String, CaseIterable, Identifiable {
 
 /// Main-thread brain of the app: pedal logic, memories, settings, MIDI, UI snapshot.
 final class LooperController: ObservableObject {
-    static let version = "1.9.1"
+    static let version = "2.0-beta.1"
     #if arch(arm64)
     static let architecture = "Apple silicon (arm64)"
     #else
@@ -30,12 +30,15 @@ final class LooperController: ObservableObject {
     @Published var settings = MemorySettings.defaults(for: 0) { didSet { applySettings() } }
     @Published private(set) var snapshot = Snapshot()
     @Published private(set) var waveform: [Float] = []
+    /// Timeline lanes: committed audio and the current (undoable) overdub layer.
+    @Published private(set) var baseWave: [Float] = []
+    @Published private(set) var dubWave: [Float] = []
     @Published private(set) var memoryIndex = 0
     @Published private(set) var memoryInfo: [MemoryInfo] = []
     @Published var dirty = false
     @Published var pendingMemorySwitch: Int?
     @Published var message: String?
-    @Published var selectedTab: SideTab = .audio
+    @Published var selectedTab: SideTab = .setup
     @Published var themeID: ThemeID = ThemeID(rawValue: UserDefaults.standard.string(forKey: "theme") ?? "") ?? .midnight {
         didSet { UserDefaults.standard.set(themeID.rawValue, forKey: "theme") }
     }
@@ -469,6 +472,8 @@ final class LooperController: ObservableObject {
         if L > 0 { s.position = Double(min(c.playPos, L)) / Double(L) }
         s.canUndo = c.currentLayer >= 0 && c.currentLayerActive
         s.canRedo = c.currentLayer >= 0 && !c.currentLayerActive
+        s.hasDubLayer = c.currentLayer >= 0
+        s.dubActive = c.currentLayerActive
         s.inLevel = c.inLevel
         s.inLevelL = c.inLevelL
         s.inLevelR = c.inLevelR
@@ -499,6 +504,11 @@ final class LooperController: ObservableObject {
         if L > 0 {
             let outFrames = c.loopTempo > 0 ? Double(L) * c.loopTempo / max(1, c.tempo) : Double(L)
             s.totalMeasures = max(1, settings.loopMeasures > 0 ? settings.loopMeasures : Int((outFrames / measureFrames).rounded()))
+        }
+        if s.rhythmRunning {
+            let steps = max(1, pattern.steps)
+            let stepFrames = measureFrames / Double(steps)
+            s.rhythmStep = Int(Double(c.rhythmFrame) / stepFrames) % steps
         }
         if s.state == .armed { s.countdownBeats = Int((Double(c.countdown) / beatFrames).rounded(.up)) }
         if s != snapshot { snapshot = s }
@@ -576,23 +586,75 @@ final class LooperController: ObservableObject {
         let bins = 240
         guard len > 0 else {
             if !waveform.isEmpty { waveform = [] }
+            if !baseWave.isEmpty { baseWave = [] }
+            if !dubWave.isEmpty { dubWave = [] }
             return
         }
         var out = [Float](repeating: 0, count: bins)
+        var base = [Float](repeating: 0, count: bins)
+        var dub = [Float](repeating: 0, count: bins)
         for b in 0..<bins {
             let s0 = b * len / bins
             let s1 = max(s0 + 1, (b + 1) * len / bins)
             let step = max(1, (s1 - s0) / 64)
             var m: Float = 0
+            var mb: Float = 0
+            var md: Float = 0
             var j = s0
             while j < s1 && j < len {
                 let v = c.peak(at: j)
                 if v > m { m = v }
+                let lp = c.lanePeaks(at: j)
+                if lp.base > mb { mb = lp.base }
+                if lp.dub > md { md = lp.dub }
                 j += step
             }
             out[b] = min(1, m)
+            base[b] = min(1, mb)
+            dub[b] = min(1, md)
         }
         waveform = out
+        baseWave = base
+        dubWave = c.currentLayer >= 0 ? dub : []
+    }
+
+    static func thumbnail(from wave: [Float], count: Int) -> [Float] {
+        guard !wave.isEmpty else { return [] }
+        return (0..<count).map { i in
+            let a = i * wave.count / count
+            let b = max(a + 1, (i + 1) * wave.count / count)
+            return wave[a..<min(b, wave.count)].max() ?? 0
+        }
+    }
+
+    /// Next action of the main button / Space bar, as shown in the interface.
+    var nextActionLabel: String {
+        switch snapshot.state {
+        case .empty: return settings.autoRec ? "Arm auto rec" : "Record"
+        case .armed, .autoRecArmed: return "Cancel"
+        case .recording: return settings.recAction == .recDubPlay && !settings.oneShot ? "Close loop · Overdub" : "Close loop · Play"
+        case .playing: return settings.oneShot ? "Restart" : "Overdub"
+        case .overdubbing: return "Play"
+        case .stopped: return "Play"
+        }
+    }
+
+    // Transport buttons in the toolbar
+    func recordButton() {
+        switch core.state {
+        case .empty, .recording, .playing, .armed, .autoRecArmed: pedalTap()
+        case .overdubbing: break
+        case .stopped: core.send(.play)
+        }
+    }
+
+    func playButton() {
+        switch core.state {
+        case .stopped: core.send(.play)
+        case .overdubbing: core.send(.stopOverdub)
+        case .recording: core.send(.finishRecording(next: .playing))
+        default: break
+        }
     }
 
     func flash(_ text: String) {
@@ -675,6 +737,7 @@ final class LooperController: ObservableObject {
         let L = core.loopLength
         var s = settings
         s.savedSeconds = Double(L) / core.sampleRate
+        s.thumb = Self.thumbnail(from: waveform, count: 28)
         s.loopTempo = L > 0 ? core.loopTempo : 0
         do {
             try FileManager.default.createDirectory(at: store.dir(i), withIntermediateDirectories: true)

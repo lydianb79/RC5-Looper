@@ -956,6 +956,28 @@ final class LoopCore {
         }
     }
 
+    /// Peaks for the two timeline lanes: committed audio (base + layers being merged)
+    /// and the current, undoable overdub layer (shown even while undone).
+    func lanePeaks(at j: Int) -> (base: Float, dub: Float) {
+        guard j >= 0 && j < capacity else { return (0, 0) }
+        var l = baseL[j]
+        var r = baseR[j]
+        var dl: Float = 0
+        var dr: Float = 0
+        for li in 0..<2 {
+            let lp = li == 0 ? layAL : layBL
+            let rp = li == 0 ? layAR : layBR
+            if li == currentLayer {
+                dl += lp[j]
+                dr += rp[j]
+            } else if jobActive[li] != 0 && jobMerge[li] != 0 {
+                l += lp[j]
+                r += rp[j]
+            }
+        }
+        return (max(abs(l), abs(r)), max(abs(dl), abs(dr)))
+    }
+
     @inline(__always) func peak(at j: Int) -> Float {
         guard j >= 0 && j < capacity else { return 0 }
         let l = baseL[j] + g0 * layAL[j] + g1 * layBL[j]

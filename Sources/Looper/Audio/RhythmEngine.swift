@@ -118,6 +118,12 @@ final class RhythmEngine {
 
     var currentBeatsPerMeasure: Double { beats[curPattern] }
 
+    /// Velocity of one grid cell (read-only table, safe from the main thread).
+    func cell(pattern: Int, variation: Int, drum: Int, step: Int) -> Float {
+        guard pattern >= 0 && pattern < patternCount, drum >= 0 && drum < kInstrumentCount, step >= 0 && step < kMaxSteps else { return 0 }
+        return table[((pattern * 2 + (variation == 0 ? 0 : 1)) * kInstrumentCount + drum) * kMaxSteps + step]
+    }
+
     func configure(tempo: Double, pattern: Int, variation: Int, kit: Int, reverb: Float) {
         synth.prepare()
         requestedVar = variation == 0 ? 0 : 1
