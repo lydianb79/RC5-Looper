@@ -4,7 +4,7 @@ import Foundation
 extension LooperController {
     func trackPress(_ t: Int) {
         guard core.loopLength > 0 else { flash("Record track 1 first"); return }
-        guard !settings.reverse else { flash("Tracks 2 and 3 can't record while Reverse is on"); return }
+        guard !settings.reverse else { flash("Tracks 2–5 can't record while Reverse is on"); return }
         let st = snapshot.tracks[t].state
         core.send(.trackPress(t))
         dirty = true
@@ -40,7 +40,7 @@ extension LooperController {
 
     func setTrackLevel(_ t: Int, _ v: Double) {
         var l = settings.trackLevels
-        while l.count < 2 { l.append(1) }
+        while l.count < LoopCore.subCount { l.append(1) }
         l[t] = v
         settings.trackLevels = l
     }
@@ -82,10 +82,10 @@ extension LooperController {
         flash("FADE OUT")
     }
 
-    /// Waveforms of tracks 2 and 3 (one cycle of each is drawn across its own lane).
+    /// Waveforms of tracks 2–5 (one cycle of each is drawn across its own lane).
     func updateTrackWaves() {
-        var waves: [[Float]] = [[], []]
-        for t in 0..<2 {
+        var waves: [[Float]] = Array(repeating: [], count: LoopCore.subCount)
+        for t in 0..<LoopCore.subCount {
             let tr = core.sub(t)
             let len = tr.state == .recording ? tr.recMaxIdx + 1 : (tr.hasContent ? tr.length : 0)
             guard len > 1 else { continue }

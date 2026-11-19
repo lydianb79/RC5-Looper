@@ -1,22 +1,23 @@
 import SwiftUI
 
-// MARK: - Track lanes (track 1 = main loop, tracks 2 and 3 synced to it)
+// MARK: - Track lanes (track 1 = main loop, tracks 2–5 synced to it)
 
 struct TrackLanesView: View {
     @EnvironmentObject var looper: LooperController
 
     var body: some View {
         let snap = looper.snapshot
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             MainLane(snap: snap)
-            SubLane(index: 0, snap: snap.tracks[0], main: snap)
-            SubLane(index: 1, snap: snap.tracks[1], main: snap)
+            ForEach(0..<LoopCore.subCount, id: \.self) { t in
+                SubLane(index: t, snap: snap.tracks[t], main: snap)
+            }
         }
         .frame(maxWidth: .infinity)
     }
 }
 
-private let laneHeight: CGFloat = 68
+private let laneHeight: CGFloat = 48
 private let laneHeaderWidth: CGFloat = 168
 
 private struct MainLane: View {
@@ -47,7 +48,7 @@ private struct MainLane: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
+            .padding(.vertical, 4)
             MuteButton(muted: looper.mainMuted) { looper.toggleMainMute() }
             LevelSlider(value: Binding(get: { looper.settings.loopLevel }, set: { looper.settings.loopLevel = $0 }))
         }
@@ -74,7 +75,7 @@ private struct SubLane: View {
     let snap: TrackSnapshot
     let main: Snapshot
 
-    private var color: Color { index == 0 ? Color(hex: 0x34D399) : Color(hex: 0xF472B6) }
+    private var color: Color { trackColors[index % trackColors.count] }
 
     var body: some View {
         let st = snap.state
@@ -91,7 +92,7 @@ private struct SubLane: View {
                         Text(label(st)).font(.system(size: 11.5, weight: .semibold))
                     }
                     .foregroundColor(st == 0 ? UI.text : .white)
-                    .frame(width: 118, height: 30)
+                    .frame(width: 118, height: 28)
                     .background(RoundedRectangle(cornerRadius: 8).fill(st == 0 ? UI.well : stateColor.opacity(0.8)))
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(st == 0 ? UI.line2 : stateColor, lineWidth: 1))
                     .contentShape(Rectangle())
@@ -116,7 +117,7 @@ private struct SubLane: View {
                     .background(Capsule().fill(UI.panel.opacity(looper.trackWaves[index].isEmpty ? 0 : 0.8)))
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
+            .padding(.vertical, 4)
             IconTool(symbol: "arrow.uturn.backward", enabled: snap.undoDepth > 0, help: "Undo on track \(index + 2)") { looper.trackUndo(index) }
             IconTool(symbol: "arrow.uturn.forward", enabled: snap.redoDepth > 0, help: "Redo on track \(index + 2)") { looper.trackRedo(index) }
             IconTool(symbol: "trash", enabled: st != 0, help: "Clear track \(index + 2)") { looper.trackClear(index) }
@@ -157,6 +158,8 @@ private struct SubLane: View {
         }
     }
 }
+
+private let trackColors: [Color] = [Color(hex: 0x34D399), Color(hex: 0xF472B6), Color(hex: 0xFBBF24), Color(hex: 0x60A5FA)]
 
 private struct Badge: View {
     let text: String

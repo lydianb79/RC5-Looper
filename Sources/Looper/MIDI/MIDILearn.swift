@@ -3,7 +3,7 @@ import Foundation
 /// Actions that can be assigned to any MIDI note, CC or program change ("MIDI learn").
 enum MIDIAction: String, CaseIterable, Identifiable, Codable {
     case recordDub, playStop, stop, undo, redo, clear, rhythm, tap, variation
-    case memoryUp, memoryDown, track2, track3, mute, fadeOut, double, write, song
+    case memoryUp, memoryDown, track2, track3, track4, track5, mute, fadeOut, double, write, song
 
     var id: String { rawValue }
 
@@ -22,6 +22,8 @@ enum MIDIAction: String, CaseIterable, Identifiable, Codable {
         case .memoryDown: return "Previous memory"
         case .track2: return "Track 2 record / overdub"
         case .track3: return "Track 3 record / overdub"
+        case .track4: return "Track 4 record / overdub"
+        case .track5: return "Track 5 record / overdub"
         case .mute: return "Mute loop (drop)"
         case .fadeOut: return "Fade out"
         case .double: return "×2 loop length"

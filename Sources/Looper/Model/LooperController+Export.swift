@@ -25,10 +25,10 @@ extension LooperController {
         let s = settings
         let tempo = c.loopTempo > 0 ? c.loopTempo : s.tempo
         let mainLevel = Float(s.loopLevel)
-        let levels = [Float(s.trackLevels.first ?? 1), Float(s.trackLevels.count > 1 ? s.trackLevels[1] : 1)]
-        let mutes = [trackMuted[0], trackMuted[1]]
+        let levels = (0..<LoopCore.subCount).map { Float($0 < s.trackLevels.count ? s.trackLevels[$0] : 1) }
+        let mutes = trackMuted
         let mainMute = mainMuted
-        let subLens = [c.sub1.hasContent ? c.sub1.length : 0, c.sub2.hasContent ? c.sub2.length : 0]
+        let subLens = c.subs.map { $0.hasContent ? $0.length : 0 }
         let total = L * max(1, repeats)
         let rl = Float(s.rhythmLevel)
         exportProgress = 0
@@ -85,7 +85,7 @@ extension LooperController {
                             l = m.0 * mainLevel
                             r = m.1 * mainLevel
                         }
-                        for t in 0..<2 where subLens[t] > 0 && !mutes[t] {
+                        for t in 0..<LoopCore.subCount where subLens[t] > 0 && !mutes[t] {
                             let m = c.sub(t).stack.mix(a % subLens[t])
                             l += m.0 * levels[t]
                             r += m.1 * levels[t]

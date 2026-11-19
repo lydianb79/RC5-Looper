@@ -418,7 +418,7 @@ struct HelpView: View {
         ("Esc / S", "Stop (hold Esc 2 s = clear)"),
         ("⌘Z / ⇧⌘Z", "Undo / redo overdubs (up to 5 steps)"),
         ("U", "Undo / redo the last overdub (toggle)"),
-        ("2 / 3", "Track 2 / 3: record → overdub ↔ play"),
+        ("2 … 5", "Tracks 2–5: record → overdub ↔ play"),
         ("D  or  ⌘D", "Double the loop length (×2)"),
         ("X", "Mute / unmute the loop (rhythm keeps playing)"),
         ("F", "Fade out and stop"),

@@ -20,7 +20,7 @@ enum SideTab: String, CaseIterable, Identifiable {
 /// Main-thread brain of the app: pedal logic, memories, settings, MIDI, UI snapshot.
 final class LooperController: ObservableObject {
     static let shared = LooperController()
-    static let version = "2.0-beta.13"
+    static let version = "2.0-beta.14"
     #if arch(arm64)
     static let architecture = "Apple silicon (arm64)"
     #else
@@ -52,9 +52,11 @@ final class LooperController: ObservableObject {
     @Published var showRhythm: Bool = UserDefaults.standard.object(forKey: "showRhythm") as? Bool ?? true {
         didSet { UserDefaults.standard.set(showRhythm, forKey: "showRhythm") }
     }
-    /// Tracks 2 and 3: waveforms and mutes. Track 1 mute and the global "drop" mute.
-    @Published var trackWaves: [[Float]] = [[], []]
-    @Published var trackMuted: [Bool] = [false, false] { didSet { core.sub1.muted = trackMuted[0]; core.sub2.muted = trackMuted[1] } }
+    /// Tracks 2–5: waveforms and mutes. Track 1 mute and the global "drop" mute.
+    @Published var trackWaves: [[Float]] = Array(repeating: [], count: LoopCore.subCount)
+    @Published var trackMuted: [Bool] = Array(repeating: false, count: LoopCore.subCount) {
+        didSet { for t in 0..<LoopCore.subCount { core.sub(t).muted = trackMuted[t] } }
+    }
     @Published var mainMuted = false { didSet { core.mainMuted = mainMuted } }
     @Published var allMuted = false { didSet { core.allMuted = allMuted } }
     /// Song mode: memories chained with repeat counts, switched seamlessly at the loop end.
@@ -335,10 +337,10 @@ final class LooperController: ObservableObject {
         c.stretchMode = settings.stretchMode
         c.tempo = settings.tempo
         c.trackDubAfterRecord = settings.recAction == .recDubPlay
-        c.sub1.level = Float(settings.trackLevels.first ?? 1)
-        c.sub2.level = Float(settings.trackLevels.count > 1 ? settings.trackLevels[1] : 1)
-        c.sub1.replaceMode = settings.dubMode == .replace
-        c.sub2.replaceMode = settings.dubMode == .replace
+        for t in 0..<LoopCore.subCount {
+            c.sub(t).level = Float(t < settings.trackLevels.count ? settings.trackLevels[t] : 1)
+            c.sub(t).replaceMode = settings.dubMode == .replace
+        }
         Self.apply(settings.inputFX, to: c.inputFX)
         Self.apply(settings.loopFX, to: c.loopFX)
     }
@@ -547,7 +549,7 @@ final class LooperController: ObservableObject {
         s.doubling = c.stack.doubling
         s.swapPending = c.swapPending
         s.masterCycle = c.masterCycle
-        for t in 0..<2 {
+        for t in 0..<LoopCore.subCount {
             let tr = c.sub(t)
             var ts = TrackSnapshot()
             ts.state = tr.state.rawValue
@@ -672,7 +674,7 @@ final class LooperController: ObservableObject {
         }
         let bins = 240
         guard len > 0 else {
-            if !trackWaves[0].isEmpty || !trackWaves[1].isEmpty { trackWaves = [[], []] }
+            if trackWaves.contains(where: { !$0.isEmpty }) { trackWaves = Array(repeating: [], count: LoopCore.subCount) }
             if !waveform.isEmpty { waveform = [] }
             if !baseWave.isEmpty { baseWave = [] }
             if !dubWave.isEmpty { dubWave = [] }
@@ -789,9 +791,9 @@ final class LooperController: ObservableObject {
 
     // MARK: Memories
 
-    /// Loads tracks 2 and 3 of memory `i` (after the main loop is loaded).
+    /// Loads tracks 2–5 of memory `i` (after the main loop is loaded).
     private func loadTracks(of i: Int) {
-        for t in 0..<2 where store.hasTrack(i, t) {
+        for t in 0..<LoopCore.subCount where store.hasTrack(i, t) {
             let tr = core.sub(t)
             core.send(.trackPrepareLoad(t))
             waitForCore()
@@ -891,7 +893,7 @@ final class LooperController: ObservableObject {
             } else {
                 store.deleteAudio(i)
             }
-            for t in 0..<2 {
+            for t in 0..<LoopCore.subCount {
                 let tr = core.sub(t)
                 if L > 0 && tr.hasContent {
                     try MemoryStore.writeWAV(to: store.trackURL(i, t), stack: tr.stack, sampleRate: core.sampleRate, length: tr.length)
@@ -1083,6 +1085,8 @@ final class LooperController: ObservableObject {
         case .memoryDown: memoryDown()
         case .track2: trackPress(0)
         case .track3: trackPress(1)
+        case .track4: trackPress(2)
+        case .track5: trackPress(3)
         case .mute: toggleDrop()
         case .fadeOut: fadeOut()
         case .double: doubleLoop()
@@ -1133,6 +1137,8 @@ final class LooperController: ObservableObject {
             case "u": self.undoRedo()
             case "2": self.trackPress(0)
             case "3": self.trackPress(1)
+            case "4": self.trackPress(2)
+            case "5": self.trackPress(3)
             case "d": self.doubleLoop()
             case "x": self.toggleDrop()
             case "f": self.fadeOut()

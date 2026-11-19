@@ -86,7 +86,7 @@ struct MemorySettings: Codable, Equatable {
     var loopTempo = 0.0          // tempo the loop audio was recorded at (0 = same as tempo)
     var stretchMode = StretchMode.keepPitch
     var loopMeasures = 0
-    var trackLevels: [Double] = [1, 1]   // tracks 2 and 3
+    var trackLevels: [Double] = [1, 1, 1, 1]   // tracks 2…5
     var inputFX = FXChainSettings()
     var loopFX = FXChainSettings()
     var countInBars = 1          // 1 or 2 bars
@@ -144,7 +144,7 @@ extension MemorySettings {
         loopLength = v(.loopLength, loopLength)
         countInBars = v(.countInBars, countInBars)
         trackLevels = v(.trackLevels, trackLevels)
-        if trackLevels.count < 2 { trackLevels += Array(repeating: 1, count: 2 - trackLevels.count) }
+        if trackLevels.count < 4 { trackLevels += Array(repeating: 1, count: 4 - trackLevels.count) }
         func chain(_ key: CodingKeys) -> FXChainSettings? {
             guard c.contains(key) else { return nil }
             if let nested = try? c.nestedContainer(keyedBy: FXChainSettings.CodingKeys.self, forKey: key), nested.contains(.effects) {
@@ -194,10 +194,10 @@ struct Snapshot: Equatable {
     var doubling = false
     var swapPending = false
     var masterCycle = 0
-    var tracks: [TrackSnapshot] = [TrackSnapshot(), TrackSnapshot()]
+    var tracks: [TrackSnapshot] = Array(repeating: TrackSnapshot(), count: 4)
 }
 
-/// UI state of tracks 2 and 3.
+/// UI state of tracks 2…5.
 struct TrackSnapshot: Equatable {
     var state = 0                 // SubTrack.State raw value: 0 empty, 1 recording, 2 playing, 3 overdubbing
     var cycles = 0

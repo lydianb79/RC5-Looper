@@ -22,7 +22,7 @@ enum LoopCommand {
     case redo
     case doubleLoop
     case fadeOut
-    case trackPress(Int)             // extra tracks 1…2 (tracks 2 and 3 in the UI)
+    case trackPress(Int)             // extra tracks 0…3 (tracks 2–5 in the UI)
     case trackUndo(Int)
     case trackRedo(Int)
     case trackClear(Int)
@@ -37,7 +37,7 @@ enum LoopCommand {
 /// A preloaded memory that replaces the current one at the next loop point (song mode).
 struct SwapInfo {
     var length = 0
-    var trackLengths: (Int, Int) = (0, 0)
+    var trackLengths: [Int] = []
     var loopTempo: Double = 0
     var tempo: Double = 120
     var pattern = 0
@@ -49,20 +49,21 @@ struct SwapInfo {
 /// The realtime looper engine.
 ///
 /// * Track 1 (the main loop) lives in `stack` (base recording + undoable overdub layers,
-///   see LayerStack). Tracks 2 and 3 (`sub1`, `sub2`) are synced to it (see SubTrack).
+///   see LayerStack). Tracks 2–5 (`subs`) are synced to it (see SubTrack).
 /// * Input FX process the input before it is recorded; loop FX process the loop playback.
 final class LoopCore {
     let sampleRate: Double
     let capacity: Int
 
     let stack: LayerStack
-    let sub1: SubTrack
-    let sub2: SubTrack
+    /// Tracks 2…5.
+    static let subCount = 4
+    let subs: [SubTrack]
     let inputFX: FXChain
     let loopFX: FXChain
     var baseL: UnsafeMutablePointer<Float> { stack.baseL }
     var baseR: UnsafeMutablePointer<Float> { stack.baseR }
-    func sub(_ t: Int) -> SubTrack { t == 0 ? sub1 : sub2 }
+    func sub(_ t: Int) -> SubTrack { subs[max(0, min(LoopCore.subCount - 1, t))] }
 
     let rhythm: RhythmEngine
 
@@ -154,6 +155,9 @@ final class LoopCore {
     private var gainTarget: Float = 1
     private var gainStep: Float = 0.001
     private var jobDelay = 0
+    /// Per-callback flags so idle tracks cost nothing per sample.
+    private var anySubContent = false
+    private var anySubWriting = false
     private var mainGain: Float = 1
     private var allGain: Float = 1
     private var muteStep: Float = 0.001
@@ -207,8 +211,7 @@ final class LoopCore {
             calloc(n, MemoryLayout<Float>.size)!.assumingMemoryBound(to: Float.self)
         }
         stack = LayerStack(capacity: cap)
-        sub1 = SubTrack(capacity: cap, sampleRate: sampleRate)
-        sub2 = SubTrack(capacity: cap, sampleRate: sampleRate)
+        subs = (0..<LoopCore.subCount).map { _ in SubTrack(capacity: cap, sampleRate: sampleRate) }
         inputFX = FXChain(sampleRate: sampleRate)
         loopFX = FXChain(sampleRate: sampleRate)
         muteStep = Float(1.0 / (0.012 * sampleRate))
@@ -497,8 +500,7 @@ final class LoopCore {
         guard L > 0, L * 2 <= capacity, tailRemaining == 0, state != .recording, !stack.doubling else { return }
         if state == .overdubbing { state = .playing }
         guard stack.startDouble(length: L) else { return }
-        sub1.mainDoubled(oldMainLength: L)
-        sub2.mainDoubled(oldMainLength: L)
+        for tr in subs { tr.mainDoubled(oldMainLength: L) }
         let odd = ((masterCycle % 2) + 2) % 2 == 1
         if odd {
             playPos += L
@@ -526,10 +528,10 @@ final class LoopCore {
         masterCycle = 0
         wrapCount = 0
         syncStretch()
-        let lens = [info.trackLengths.0, info.trackLengths.1]
-        for t in 0..<2 {
+        let lens = info.trackLengths
+        for t in 0..<LoopCore.subCount {
             let tr = sub(t)
-            if lens[t] > 0 {
+            if t < lens.count && lens[t] > 0 {
                 tr.stack.swapPreloaded()
                 tr.setLoaded(length: lens[t], mainLength: loopLength)
             } else {
@@ -601,8 +603,7 @@ final class LoopCore {
     }
 
     private func enterStopped() {
-        sub1.mainStopped(mainLength: loopLength)
-        sub2.mainStopped(mainLength: loopLength)
+        for tr in subs { tr.mainStopped(mainLength: loopLength) }
         if pendingSwap != nil { applySwap() }
         masterCycle = 0
         endingPending = false
@@ -618,8 +619,7 @@ final class LoopCore {
 
     private func clearAll() {
         stack.clearAll()
-        sub1.clear()
-        sub2.clear()
+        for tr in subs { tr.clear() }
         pendingSwap = nil
         masterCycle = 0
         jobDelay = 0
@@ -650,8 +650,7 @@ final class LoopCore {
     private func onWrap() {
         masterCycle += reverse ? -1 : 1
         wrapCount &+= 1
-        sub1.mainWrapped(cycle: masterCycle, mainLength: loopLength)
-        sub2.mainWrapped(cycle: masterCycle, mainLength: loopLength)
+        for tr in subs { tr.mainWrapped(cycle: masterCycle, mainLength: loopLength) }
         if pendingSwap != nil {
             applySwap()
             return
@@ -686,24 +685,31 @@ final class LoopCore {
             r = m.1 * mainGain
         }
         let L = loopLength
-        if sub1.hasContent || sub2.hasContent {
+        if anySubContent {
             let c = cycleOf(i, L)
-            let a = sub1.read(cycle: c, index: i, mainLength: L)
-            let b = sub2.read(cycle: c, index: i, mainLength: L)
-            l += a.0 + b.0
-            r += a.1 + b.1
+            var k = 0
+            while k < LoopCore.subCount {
+                let a = subs[k].read(cycle: c, index: i, mainLength: L)
+                l += a.0
+                r += a.1
+                k += 1
+            }
         }
         return (l, r)
     }
 
     /// Input for tracks 2 / 3 (they record and overdub while the main loop plays).
     @inline(__always) private func writeSubs(_ w: Int, _ L: Int, _ inL: Float, _ inR: Float, stretched: Bool) {
-        let s1 = sub1.state == .recording || sub1.state == .overdubbing
-        let s2 = sub2.state == .recording || sub2.state == .overdubbing
-        guard s1 || s2 else { return }
+        guard anySubWriting else { return }
         let c = cycleOf(w, L)
-        if s1 { sub1.write(cycle: c, index: w, mainLength: L, inL, inR, fillGaps: stretched) }
-        if s2 { sub2.write(cycle: c, index: w, mainLength: L, inL, inR, fillGaps: stretched) }
+        var k = 0
+        while k < LoopCore.subCount {
+            let tr = subs[k]
+            if tr.state == .recording || tr.state == .overdubbing {
+                tr.write(cycle: c, index: w, mainLength: L, inL, inR, fillGaps: stretched)
+            }
+            k += 1
+        }
     }
 
     @inline(__always) private func wrapIndex(_ x: Int, _ L: Int) -> Int {
@@ -786,7 +792,7 @@ final class LoopCore {
             // replace mode: only the other tracks keep sounding
             sL = 0
             sR = 0
-            if sub1.hasContent || sub2.hasContent {
+            if anySubContent {
                 let m = mix(min(L - 1, max(0, Int(vPos))), main: false)
                 sL = m.0
                 sR = m.1
@@ -913,8 +919,13 @@ final class LoopCore {
         } else if stack.hasJobs {
             stack.processJobs(budget: 1 << 17)
         }
-        if sub1.stack.hasJobs { sub1.stack.processJobs(budget: 1 << 16) }
-        if sub2.stack.hasJobs { sub2.stack.processJobs(budget: 1 << 16) }
+        anySubContent = false
+        anySubWriting = false
+        for tr in subs {
+            if tr.stack.hasJobs { tr.stack.processJobs(budget: 1 << 15) }
+            if tr.hasContent { anySubContent = true }
+            if tr.state == .recording || tr.state == .overdubbing { anySubWriting = true }
+        }
         if inputFX.tempo != tempo { inputFX.tempo = tempo }
         if loopFX.tempo != tempo { loopFX.tempo = tempo }
         rhythm.configure(tempo: tempo, pattern: patternIndex, variation: variation, kit: kitIndex, reverb: reverbLevel, humanize: humanize)
@@ -960,8 +971,13 @@ final class LoopCore {
                 mainGain = mainGain < t ? min(t, mainGain + muteStep) : max(t, mainGain - muteStep)
             }
             if allGain != allTarget { allGain = allGain < allTarget ? min(allTarget, allGain + muteStep) : max(allTarget, allGain - muteStep) }
-            sub1.tickGain()
-            sub2.tickGain()
+            if anySubContent {
+                var k = 0
+                while k < LoopCore.subCount {
+                    subs[k].tickGain()
+                    k += 1
+                }
+            }
             let aL = abs(inL)
             let aR = abs(inR)
             if aL > inPkL { inPkL = aL }

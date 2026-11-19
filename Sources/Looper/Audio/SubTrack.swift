@@ -1,6 +1,6 @@
 import Foundation
 
-/// An extra loop track (tracks 2 and 3), synced to the main loop like on the RC-505.
+/// An extra loop track (tracks 2–5), synced to the main loop like on the RC-505.
 ///
 /// Its length is always a whole number of main-loop cycles. Its play position is derived
 /// from the main loop: index = (main cycle × main length + main position) mod track length,

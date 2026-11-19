@@ -191,6 +191,8 @@ struct LooperCommands: Commands {
             Divider()
             Button("Track 2 Record / Overdub  (2)") { looper.trackPress(0) }
             Button("Track 3 Record / Overdub  (3)") { looper.trackPress(1) }
+            Button("Track 4 Record / Overdub  (4)") { looper.trackPress(2) }
+            Button("Track 5 Record / Overdub  (5)") { looper.trackPress(3) }
             Button("Double Loop Length ×2  (D)") { looper.doubleLoop() }
                 .keyboardShortcut("d", modifiers: .command)
             Button("Mute / Unmute Loop  (X)") { looper.toggleDrop() }

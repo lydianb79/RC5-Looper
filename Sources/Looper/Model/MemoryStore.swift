@@ -14,7 +14,7 @@ final class MemoryStore {
 
     func dir(_ i: Int) -> URL { root.appendingPathComponent(String(format: "%02d", i + 1), isDirectory: true) }
     func audioURL(_ i: Int) -> URL { dir(i).appendingPathComponent("loop.wav") }
-    /// Tracks 2 and 3 (t = 0, 1).
+    /// Tracks 2–5 (t = 0…3).
     func trackURL(_ i: Int, _ t: Int) -> URL { dir(i).appendingPathComponent("track\(t + 2).wav") }
     func hasTrack(_ i: Int, _ t: Int) -> Bool { FileManager.default.fileExists(atPath: trackURL(i, t).path) }
     func settingsURL(_ i: Int) -> URL { dir(i).appendingPathComponent("settings.json") }

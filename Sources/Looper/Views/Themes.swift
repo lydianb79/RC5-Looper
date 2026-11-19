@@ -5,6 +5,7 @@ import SwiftUI
 enum AppTheme: String, CaseIterable, Identifiable {
     case graphite, midnight, synthwave, aurora, ember, ocean, forest, daylight
     case sunset, cyberpunk, terminal, sakura, arctic, vintage
+    case nebula, desert, arcade, studioWood, candy, bauhaus
 
     var id: String { rawValue }
 
@@ -24,11 +25,17 @@ enum AppTheme: String, CaseIterable, Identifiable {
         case .sakura: return "Sakura"
         case .arctic: return "Arctic"
         case .vintage: return "Vintage Tape"
+        case .nebula: return "Nebula"
+        case .desert: return "Desert Dusk"
+        case .arcade: return "Arcade"
+        case .studioWood: return "Studio Wood"
+        case .candy: return "Candy"
+        case .bauhaus: return "Bauhaus"
         }
     }
 
     /// Background artwork.
-    enum Art { case dots, stars, synthGrid, aurora, embers, waves, hills, paper, mountains, cityRain, codeRain, petals, snow, tape }
+    enum Art { case dots, stars, synthGrid, aurora, embers, waves, hills, paper, mountains, cityRain, codeRain, petals, snow, tape, nebula, dunes, arcade, wood, candy, bauhaus }
 
     struct Palette {
         let art: Art
@@ -215,6 +222,72 @@ enum AppTheme: String, CaseIterable, Identifiable {
                            line: Color(hex: 0xD5BF98), line2: Color(hex: 0xC4AB80),
                            text: Color(hex: 0x2B1B0E), text2: Color(hex: 0x5A3E24), muted: Color(hex: 0x8A6C4C),
                            accent: Color(hex: 0xC2410C), selection: Color(hex: 0xC2410C), base: Color(hex: 0x9A3412))
+        case .nebula:
+            return Palette(art: .nebula, light: false,
+                           bgTop: Color(hex: 0x0A0418), bgMid: Color(hex: 0x120828), bgBottom: Color(hex: 0x03020A),
+                           glowA: Color(hex: 0x7C3AED, opacity: 0.35), glowB: Color(hex: 0x06B6D4, opacity: 0.25),
+                           artColor: Color(hex: 0xC026D3), artColor2: Color(hex: 0x22D3EE),
+                           panel: Color(hex: 0x120A26, opacity: 0.72), header: Color(hex: 0x110923, opacity: 0.9),
+                           lcd: Color(hex: 0x05030E), control: Color(hex: 0x24164A), controlHi: Color(hex: 0x2E1D5C),
+                           well: Color(hex: 0x1A1036), wellAlt: Color(hex: 0x150D2D), track: Color(hex: 0x372466), dim: Color(hex: 0x7A68B0),
+                           line: Color(hex: 0x2B1C55), line2: Color(hex: 0x3B2870),
+                           text: Color(hex: 0xF5F0FF), text2: Color(hex: 0xCDBEF5), muted: Color(hex: 0x9183C2),
+                           accent: Color(hex: 0xE879F9), selection: Color(hex: 0x7E22CE), base: Color(hex: 0x67E8F9))
+        case .desert:
+            return Palette(art: .dunes, light: false,
+                           bgTop: Color(hex: 0x3B1D4A), bgMid: Color(hex: 0xB45309), bgBottom: Color(hex: 0x2A1206),
+                           glowA: Color(hex: 0xF59E0B, opacity: 0.35), glowB: Color(hex: 0xDB2777, opacity: 0.25),
+                           artColor: Color(hex: 0x7C2D12), artColor2: Color(hex: 0xFDE68A),
+                           panel: Color(hex: 0x2A140C, opacity: 0.76), header: Color(hex: 0x2A140C, opacity: 0.9),
+                           lcd: Color(hex: 0x140803), control: Color(hex: 0x4A2512), controlHi: Color(hex: 0x5C3018),
+                           well: Color(hex: 0x3A1D0E), wellAlt: Color(hex: 0x32190C), track: Color(hex: 0x6B3A1D), dim: Color(hex: 0xB07A52),
+                           line: Color(hex: 0x5A2E16), line2: Color(hex: 0x73401F),
+                           text: Color(hex: 0xFFF5E6), text2: Color(hex: 0xF5D3A8), muted: Color(hex: 0xC9A27A),
+                           accent: Color(hex: 0xFB923C), selection: Color(hex: 0xB45309), base: Color(hex: 0xFDE68A))
+        case .arcade:
+            return Palette(art: .arcade, light: false,
+                           bgTop: Color(hex: 0x050510), bgMid: Color(hex: 0x080818), bgBottom: Color(hex: 0x020206),
+                           glowA: Color(hex: 0x00FF9C, opacity: 0.12), glowB: Color(hex: 0xFF00E5, opacity: 0.16),
+                           artColor: Color(hex: 0x00FF9C), artColor2: Color(hex: 0xFF00E5),
+                           panel: Color(hex: 0x0A0A1C, opacity: 0.84), header: Color(hex: 0x0B0B1E, opacity: 0.94),
+                           lcd: Color(hex: 0x000005), control: Color(hex: 0x16163A), controlHi: Color(hex: 0x1E1E4C),
+                           well: Color(hex: 0x10102A), wellAlt: Color(hex: 0x0C0C22), track: Color(hex: 0x262660), dim: Color(hex: 0x5B5BA8),
+                           line: Color(hex: 0x1E1E50), line2: Color(hex: 0x2A2A6A),
+                           text: Color(hex: 0xEFFFF7), text2: Color(hex: 0xB0F5D8), muted: Color(hex: 0x7A8FB8),
+                           accent: Color(hex: 0x00FF9C), selection: Color(hex: 0x6D28D9), base: Color(hex: 0xFF5CF0))
+        case .studioWood:
+            return Palette(art: .wood, light: false,
+                           bgTop: Color(hex: 0x3B2416), bgMid: Color(hex: 0x2A190F), bgBottom: Color(hex: 0x140B06),
+                           glowA: Color(hex: 0xFFB86B, opacity: 0.22), glowB: Color(hex: 0x8B5A2B, opacity: 0.25),
+                           artColor: Color(hex: 0x1A0F08), artColor2: Color(hex: 0x6B4426),
+                           panel: Color(hex: 0x1C130D, opacity: 0.88), header: Color(hex: 0x1A110B, opacity: 0.95),
+                           lcd: Color(hex: 0x0D0805), control: Color(hex: 0x33241A), controlHi: Color(hex: 0x403022),
+                           well: Color(hex: 0x261A12), wellAlt: Color(hex: 0x21160F), track: Color(hex: 0x4A3626), dim: Color(hex: 0x8C6E55),
+                           line: Color(hex: 0x3A2A1E), line2: Color(hex: 0x4B3828),
+                           text: Color(hex: 0xFBF1E6), text2: Color(hex: 0xE2CBB2), muted: Color(hex: 0xA88C72),
+                           accent: Color(hex: 0xF5A524), selection: Color(hex: 0x8A5A1F), base: Color(hex: 0xFFD08A))
+        case .candy:
+            return Palette(art: .candy, light: true,
+                           bgTop: Color(hex: 0xFFE4F1), bgMid: Color(hex: 0xFDF2FF), bgBottom: Color(hex: 0xDFF7F0),
+                           glowA: Color(hex: 0xF9A8D4, opacity: 0.6), glowB: Color(hex: 0x99F6E4, opacity: 0.6),
+                           artColor: Color(hex: 0xF472B6), artColor2: Color(hex: 0x2DD4BF),
+                           panel: Color(hex: 0xFFFFFF, opacity: 0.82), header: Color(hex: 0xFFFFFF, opacity: 0.9),
+                           lcd: Color(hex: 0xFCE7F3), control: Color(hex: 0xFBE3EF), controlHi: Color(hex: 0xF6D2E4),
+                           well: Color(hex: 0xFDF0F6), wellAlt: Color(hex: 0xF9E6F0), track: Color(hex: 0xEBC8DA), dim: Color(hex: 0xC08AA6),
+                           line: Color(hex: 0xF0D2E1), line2: Color(hex: 0xE5BDD1),
+                           text: Color(hex: 0x3B1530), text2: Color(hex: 0x6B2F57), muted: Color(hex: 0x9B6A88),
+                           accent: Color(hex: 0xDB2777), selection: Color(hex: 0xDB2777), base: Color(hex: 0x0D9488))
+        case .bauhaus:
+            return Palette(art: .bauhaus, light: true,
+                           bgTop: Color(hex: 0xF3EFE6), bgMid: Color(hex: 0xEDE7DA), bgBottom: Color(hex: 0xE3DCCB),
+                           glowA: Color(hex: 0xFFFFFF, opacity: 0.4), glowB: Color(hex: 0xE3DCCB, opacity: 0.4),
+                           artColor: Color(hex: 0xD62828), artColor2: Color(hex: 0x1D3FAA),
+                           panel: Color(hex: 0xFBF9F4, opacity: 0.9), header: Color(hex: 0x1A1A1A, opacity: 0.96),
+                           lcd: Color(hex: 0x1A1A1A), control: Color(hex: 0xEBE5D8), controlHi: Color(hex: 0xDED6C5),
+                           well: Color(hex: 0xF2EDE3), wellAlt: Color(hex: 0xEAE3D6), track: Color(hex: 0xCFC6B3), dim: Color(hex: 0x9C927E),
+                           line: Color(hex: 0xD9D1C0), line2: Color(hex: 0xC7BDA8),
+                           text: Color(hex: 0x141414), text2: Color(hex: 0x3A3A3A), muted: Color(hex: 0x6E675A),
+                           accent: Color(hex: 0xD62828), selection: Color(hex: 0x1D3FAA), base: Color(hex: 0x1D3FAA))
         }
     }
 }
@@ -250,7 +323,7 @@ private struct ThemeArt: View {
 
     var body: some View {
         switch palette.art {
-        case .stars, .aurora, .embers, .waves, .synthGrid, .cityRain, .codeRain, .petals, .snow:
+        case .stars, .aurora, .embers, .waves, .synthGrid, .cityRain, .codeRain, .petals, .snow, .nebula, .arcade:
             TimelineView(.animation(minimumInterval: 1.0 / 15.0)) { tl in
                 let t = tl.date.timeIntervalSinceReferenceDate
                 Canvas { ctx, size in draw(&ctx, size, t) }
@@ -588,6 +661,123 @@ private struct ThemeArt: View {
                 let y = h * (0.1 + 0.2 * CGFloat(k))
                 ctx.fill(Path(CGRect(x: 0, y: y, width: w, height: 2)), with: .color(p.artColor2.opacity(0.06)))
             }
+
+        case .nebula:
+            for i in 0..<7 {
+                let r = 220 + rand(i, 130) * 280
+                let drift = CGFloat(sin(t * 0.05 + Double(i))) * 30
+                let c = CGPoint(x: rand(i, 131) * w + drift, y: rand(i, 132) * h)
+                let col = i % 3 == 0 ? p.artColor : (i % 3 == 1 ? p.artColor2 : Color(hex: 0x6366F1))
+                ctx.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r * 0.7, width: 2 * r, height: 1.4 * r)),
+                         with: .radialGradient(Gradient(colors: [col.opacity(0.28), .clear]), center: c, startRadius: 0, endRadius: r))
+            }
+            for i in 0..<220 {
+                let tw = 0.5 + 0.5 * sin(t * (0.5 + Double(rand(i, 133)) * 1.4) + Double(i))
+                let sz = 0.8 + rand(i, 134) * 1.6
+                ctx.fill(Path(ellipseIn: CGRect(x: rand(i, 135) * w, y: rand(i, 136) * h, width: sz, height: sz)),
+                         with: .color(.white.opacity(0.25 + 0.6 * tw)))
+            }
+
+        case .dunes:
+            let sunC = CGPoint(x: w * 0.3, y: h * 0.42)
+            ctx.fill(Path(ellipseIn: CGRect(x: sunC.x - 80, y: sunC.y - 80, width: 160, height: 160)), with: .color(p.artColor2.opacity(0.85)))
+            ctx.fill(Path(ellipseIn: CGRect(x: sunC.x - 300, y: sunC.y - 300, width: 600, height: 600)),
+                     with: .radialGradient(Gradient(colors: [p.artColor2.opacity(0.3), .clear]), center: sunC, startRadius: 70, endRadius: 300))
+            let dunes: [(CGFloat, Double, Double)] = [(0.6, 0.55, 0.0), (0.7, 0.75, 1.3), (0.82, 0.95, 2.6)]
+            for (di, d) in dunes.enumerated() {
+                var path = Path()
+                path.move(to: CGPoint(x: 0, y: h))
+                for st in 0...60 {
+                    let x = w * CGFloat(st) / 60
+                    let y = h * d.0 - 60 * CGFloat(sin(Double(st) * 0.11 + d.2)) - 25 * CGFloat(sin(Double(st) * 0.29 + Double(di)))
+                    path.addLine(to: CGPoint(x: x, y: y))
+                }
+                path.addLine(to: CGPoint(x: w, y: h))
+                path.closeSubpath()
+                ctx.fill(path, with: .color(p.artColor.opacity(d.1)))
+            }
+
+        case .arcade:
+            // scanlines
+            var y: CGFloat = 0
+            while y < h {
+                ctx.fill(Path(CGRect(x: 0, y: y, width: w, height: 1)), with: .color(.white.opacity(0.025)))
+                y += 3
+            }
+            // pixel invaders marching
+            let shape = ["00100000100", "00010001000", "00111111100", "01101110110", "11111111111", "10111111101", "10100000101", "00011011000"]
+            let px: CGFloat = 5
+            let march = CGFloat((t * 12).truncatingRemainder(dividingBy: 160))
+            for row in 0..<3 {
+                for col in 0..<9 {
+                    let ox = CGFloat(col) * 150 + march + CGFloat(row % 2) * 60 - 80
+                    let oy = h * 0.12 + CGFloat(row) * 90
+                    let colr = row == 1 ? p.artColor2 : p.artColor
+                    for (ry, line) in shape.enumerated() {
+                        for (rx, ch) in line.enumerated() where ch == "1" {
+                            ctx.fill(Path(CGRect(x: ox + CGFloat(rx) * px, y: oy + CGFloat(ry) * px, width: px - 1, height: px - 1)),
+                                     with: .color(colr.opacity(0.13)))
+                        }
+                    }
+                }
+            }
+            // ground line
+            ctx.fill(Path(CGRect(x: 0, y: h - 40, width: w, height: 2)), with: .color(p.artColor.opacity(0.3)))
+
+        case .wood:
+            // vertical planks with grain
+            let plank: CGFloat = 140
+            var x: CGFloat = 0
+            var k = 0
+            while x < w {
+                let shade = 0.15 + rand(k, 140) * 0.25
+                ctx.fill(Path(CGRect(x: x, y: 0, width: plank - 3, height: h)), with: .color(p.artColor2.opacity(shade)))
+                for g in 0..<9 {
+                    var line = Path()
+                    let gx = x + 10 + CGFloat(g) * (plank - 20) / 9 + rand(k * 9 + g, 141) * 8
+                    line.move(to: CGPoint(x: gx, y: 0))
+                    for st in 1...20 {
+                        let yy = h * CGFloat(st) / 20
+                        line.addLine(to: CGPoint(x: gx + 6 * CGFloat(sin(Double(st) * 0.6 + Double(g + k))), y: yy))
+                    }
+                    ctx.stroke(line, with: .color(p.artColor.opacity(0.25)), lineWidth: 1.2)
+                }
+                ctx.fill(Path(CGRect(x: x + plank - 3, y: 0, width: 3, height: h)), with: .color(p.artColor.opacity(0.7)))
+                x += plank
+                k += 1
+            }
+
+        case .candy:
+            for i in 0..<6 {
+                let r = 160 + rand(i, 150) * 200
+                let c = CGPoint(x: rand(i, 151) * w, y: rand(i, 152) * h)
+                ctx.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r)),
+                         with: .radialGradient(Gradient(colors: [(i % 2 == 0 ? p.artColor : p.artColor2).opacity(0.18), .clear]),
+                                               center: c, startRadius: 0, endRadius: r))
+            }
+            let sprinkleColors: [Color] = [p.artColor, p.artColor2, Color(hex: 0xFBBF24), Color(hex: 0xA78BFA)]
+            for i in 0..<120 {
+                var g = ctx
+                g.translateBy(x: rand(i, 153) * w, y: rand(i, 154) * h)
+                g.rotate(by: .radians(Double(rand(i, 155)) * .pi))
+                g.fill(Path(roundedRect: CGRect(x: -7, y: -2, width: 14, height: 4), cornerRadius: 2),
+                       with: .color(sprinkleColors[i % 4].opacity(0.45)))
+            }
+
+        case .bauhaus:
+            ctx.fill(Path(ellipseIn: CGRect(x: w * 0.72, y: h * 0.08, width: 260, height: 260)), with: .color(p.artColor.opacity(0.85)))
+            ctx.fill(Path(CGRect(x: w * 0.05, y: h * 0.62, width: 300, height: 300)), with: .color(p.artColor2.opacity(0.85)))
+            var tri = Path()
+            tri.move(to: CGPoint(x: w * 0.45, y: h * 0.95))
+            tri.addLine(to: CGPoint(x: w * 0.62, y: h * 0.6))
+            tri.addLine(to: CGPoint(x: w * 0.79, y: h * 0.95))
+            tri.closeSubpath()
+            ctx.fill(tri, with: .color(Color(hex: 0xF2B705).opacity(0.9)))
+            ctx.fill(Path(CGRect(x: 0, y: h * 0.48, width: w, height: 10)), with: .color(Color(hex: 0x141414).opacity(0.85)))
+            ctx.fill(Path(CGRect(x: w * 0.33, y: 0, width: 10, height: h)), with: .color(Color(hex: 0x141414).opacity(0.85)))
+            var arcP = Path()
+            arcP.addArc(center: CGPoint(x: w * 0.2, y: h * 0.25), radius: 120, startAngle: .degrees(180), endAngle: .degrees(360), clockwise: false)
+            ctx.stroke(arcP, with: .color(Color(hex: 0x141414).opacity(0.85)), lineWidth: 18)
 
         case .paper:
             for i in 0..<5 {

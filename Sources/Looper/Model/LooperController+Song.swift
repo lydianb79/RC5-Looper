@@ -114,15 +114,15 @@ extension LooperController {
             let st = core.stack
             let len = try MemoryStore.readAudio(from: store.audioURL(m), left: st.preloadL, right: st.preloadR,
                                                 capacity: st.capacity, sampleRate: core.sampleRate)
-            var lens = [0, 0]
-            for t in 0..<2 where store.hasTrack(m, t) {
+            var lens = Array(repeating: 0, count: LoopCore.subCount)
+            for t in 0..<LoopCore.subCount where store.hasTrack(m, t) {
                 let tr = core.sub(t).stack
                 lens[t] = (try? MemoryStore.readAudio(from: store.trackURL(m, t), left: tr.preloadL, right: tr.preloadR,
                                                       capacity: tr.capacity, sampleRate: core.sampleRate)) ?? 0
             }
             var info = SwapInfo()
             info.length = len
-            info.trackLengths = (lens[0], lens[1])
+            info.trackLengths = lens
             info.loopTempo = s.loopTempo > 0 ? s.loopTempo : s.tempo
             info.tempo = s.tempo
             info.pattern = s.rhythmPattern

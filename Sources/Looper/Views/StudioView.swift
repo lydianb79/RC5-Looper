@@ -528,7 +528,7 @@ private struct StageView: View {
         VStack(alignment: .leading, spacing: 14) {
             TitleRow()
             HStack(alignment: .center, spacing: 20) {
-                HeroRing().frame(width: 228, height: 228)
+                HeroRing().frame(width: 262, height: 262)
                 TrackLanesView()
             }
             ControlRow()
@@ -985,7 +985,7 @@ private struct StepGrid: View {
             : (i % spb == 0 ? UI.well : UI.wellAlt)
         RoundedRectangle(cornerRadius: 5)
             .fill(current && hit ? Color.white : base)
-            .frame(height: editing ? 15 : 17)
+            .frame(height: editing ? 13 : 16)
             .overlay(RoundedRectangle(cornerRadius: 5).stroke(current ? (hit ? Color.white : UI.dim) : (editing ? UI.line2 : Color.clear), lineWidth: current ? 2 : 1))
             .shadow(color: current && hit ? UI.base : .clear, radius: 6)
     }
