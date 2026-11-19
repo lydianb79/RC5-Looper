@@ -44,7 +44,7 @@ Looper turns your Mac and an audio interface into a loop station. Record a phras
 - Without the rhythm, an optional **metronome click** for the count-in, while recording, or always.
 
 ### Effects (menu *Effects*)
-- **Input FX** (recorded with your playing) and **Loop FX** (playback only): DJ filter, tempo-synced ping-pong delay, reverb, bit crusher and tape stop. Settings are stored with each memory.
+- **Input FX** (recorded with your playing) and **Loop FX** (playback only), each a full chain: DJ filter, bit crusher, tempo-synced ping-pong delay, reverb and tape stop – switch on any combination. Settings are stored with each memory.
 
 ### Memories and songs
 - **99 memories** with name, loop, tracks 2 and 3, rhythm, tempo, effects and all settings. Rename by double-click.
@@ -151,7 +151,7 @@ Sources/Looper
 │   │                              compensation, time-stretch, tracks, FX, song swap, rhythm mixing
 │   ├── LayerStack.swift           base + overdub layers of one track: undo history, ×2, merging jobs
 │   ├── SubTrack.swift             tracks 2 / 3, locked to track 1 by cycle and position
-│   ├── Effects.swift              filter, delay, reverb, bit crusher, tape stop
+│   ├── Effects.swift              effect chains: filter, bit crusher, delay, reverb, tape stop
 │   ├── RhythmEngine.swift         step sequencer with groove (accents, timing, dynamics, fills)
 │   ├── RhythmLibrary.swift        patterns, kits, user pattern store
 │   ├── DrumSamples.swift          sample bank (16-bit, loudness manifest), 64-voice player, synth fallback
