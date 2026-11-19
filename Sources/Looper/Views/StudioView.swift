@@ -545,7 +545,11 @@ private struct StageView: View {
                     TrackLanesView(laneHeight: m.lane)
                 }
                 ControlRow()
-                if looper.showRhythm { RhythmPanel(cellHeight: m.cell).transition(.opacity) }
+                if looper.showRhythm {
+                    RhythmPanel(cellHeight: m.cell)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .transition(.opacity)
+                }
             }
             .frame(maxWidth: 1400, maxHeight: .infinity, alignment: .topLeading)
         }
@@ -560,13 +564,14 @@ private struct StageView: View {
         let rhythmChrome: CGFloat = looper.showRhythm ? 14 * 2 + 30 + 30 + 10 * 2 + (looper.editingPattern ? 26 : 0) : 0
         let rows = CGFloat(looper.showRhythm ? gridRows() : 0)
         let available = max(200, h - fixed - rhythmChrome)
-        // the lanes get up to 58 % of the free height, the grid the rest
-        let laneShare = looper.showRhythm ? available * 0.58 : available
-        let lane = max(44, min(looper.showRhythm ? 86 : 110, (laneShare - laneGaps) / lanes))
+        // the grid wants about 28 pt per row; the lanes get the rest, and the grid
+        // then stretches into whatever is left, so nothing stays empty
+        let gridIdeal = rows > 0 ? rows * (28 + 3) : 0
+        let lane = max(44, min(looper.showRhythm ? 100 : 150, (available - gridIdeal - laneGaps) / lanes))
         let lanesTotal = lane * lanes + laneGaps
         var cell: CGFloat = 16
         if rows > 0 {
-            cell = max(13, min(30, (available - lanesTotal - rows * 3) / rows))
+            cell = max(12, (available - lanesTotal - rows * 3) / rows)
         }
         return (lane, min(lanesTotal, 340), cell)
     }
@@ -998,6 +1003,7 @@ private struct RhythmPanel: View {
                      step: looper.snapshot.rhythmStep, names: Self.drumNames, core: looper.core,
                      editing: looper.editingPattern, version: looper.patternsVersion,
                      cellHeight: cellHeight) { d, i in looper.toggleCell(drum: d, step: i) }
+                .frame(maxHeight: .infinity, alignment: .top)
         }
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 14).fill(UI.panel))
@@ -1038,6 +1044,8 @@ private struct StepGrid: View {
                             .onTapGesture { if editing { onTap(d, i) } }
                     }
                 }
+                // rows stretch to fill the panel (up to 56 pt each)
+                .frame(minHeight: 12, idealHeight: cellHeight, maxHeight: 56)
             }
         }
     }
@@ -1052,7 +1060,7 @@ private struct StepGrid: View {
             : (i % spb == 0 ? UI.well : UI.wellAlt)
         RoundedRectangle(cornerRadius: 5)
             .fill(current && hit ? Color.white : base)
-            .frame(height: cellHeight)
+            .frame(maxHeight: .infinity)
             .overlay(RoundedRectangle(cornerRadius: 5).stroke(current ? (hit ? Color.white : UI.dim) : (editing ? UI.line2 : Color.clear), lineWidth: current ? 2 : 1))
             .shadow(color: current && hit ? UI.base : .clear, radius: 6)
     }
