@@ -44,6 +44,9 @@ Looper turns your Mac and an audio interface into a loop station. Record a phras
 - Without the rhythm, an optional **metronome click** for the count-in, while recording, or always.
 
 ### Effects (menu *Effects*)
+
+<img src="docs/effects.png" alt="Effects window" width="640">
+
 - **Input FX** (recorded with your playing) and **Loop FX** (playback only), each a full chain: DJ filter, bit crusher, tempo-synced ping-pong delay, reverb and tape stop – switch on any combination. Settings are stored with each memory.
 
 ### Memories and songs
