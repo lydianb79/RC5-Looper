@@ -86,15 +86,16 @@ struct LooperCommands: Commands {
             Button(rhythmShown ? "Hide Rhythm Panel" : "Show Rhythm Panel") { looper.showRhythm.toggle() }
                 .keyboardShortcut("r", modifiers: [.control, .command])
             Divider()
-            // Themes are listed directly in the View menu: SwiftUI submenus in the menu bar
-            // don't respond reliably on every macOS version.
-            Text("Theme")
-            ForEach(Array(AppTheme.allCases.enumerated()), id: \.element) { i, t in
-                if i < 9 {
-                    Button((themeName == t.rawValue ? "✓  " : "     ") + t.label) { looper.appTheme = t }
-                        .keyboardShortcut(KeyEquivalent(Character(String(i + 1))), modifiers: [.control, .command])
-                } else {
-                    Button((themeName == t.rawValue ? "✓  " : "     ") + t.label) { looper.appTheme = t }
+            // The menu bar no longer observes the controller (see above), so it is only rebuilt
+            // when one of the values it shows changes and the submenu stays open.
+            Menu("Theme") {
+                ForEach(Array(AppTheme.allCases.enumerated()), id: \.element) { i, t in
+                    if i < 9 {
+                        Button((themeName == t.rawValue ? "✓  " : "     ") + t.label) { looper.appTheme = t }
+                            .keyboardShortcut(KeyEquivalent(Character(String(i + 1))), modifiers: [.control, .command])
+                    } else {
+                        Button((themeName == t.rawValue ? "✓  " : "     ") + t.label) { looper.appTheme = t }
+                    }
                 }
             }
             Divider()

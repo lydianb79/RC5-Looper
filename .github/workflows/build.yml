@@ -2,6 +2,11 @@ name: Build macOS apps
 
 on:
   workflow_dispatch:
+    inputs:
+      check_only:
+        description: "Only compile (arm64 debug), no apps and no release"
+        type: boolean
+        default: false
   push:
     tags: ["v*"]
 
@@ -21,7 +26,12 @@ jobs:
           xcodebuild -version
           swift --version
 
+      - name: Compile check
+        if: ${{ inputs.check_only }}
+        run: swift build 2>&1 | grep -E "error|warning: unre|Compiling|Build complete" | head -200; swift build
+
       - name: Build arm64 and x86_64
+        if: ${{ !inputs.check_only }}
         run: |
           set -euo pipefail
           VERSION=$(grep -o 'static let version = "[^"]*"' Sources/Looper/Model/LooperController.swift | cut -d'"' -f2)
@@ -46,11 +56,13 @@ jobs:
           ls -la dist
 
       - uses: actions/upload-artifact@v4
+        if: ${{ !inputs.check_only }}
         with:
           name: Looper-${{ env.VERSION }}-macOS
           path: dist/*.zip
 
       - name: Publish GitHub release v<version>
+        if: ${{ !inputs.check_only }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

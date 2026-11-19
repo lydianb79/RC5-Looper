@@ -86,6 +86,8 @@ struct MemorySettings: Codable, Equatable {
     var loopTempo = 0.0          // tempo the loop audio was recorded at (0 = same as tempo)
     var stretchMode = StretchMode.keepPitch
     var loopMeasures = 0
+    var countInBars = 1          // 1 or 2 bars
+    var clickMode = 0            // rhythm off: 0 click only for the count-in, 1 also while recording, 2 always
     var loopLength = 0           // fixed loop length in bars (0 = none: you close the loop yourself)
     var savedSeconds = 0.0
     var thumb: [Float] = []      // small waveform preview for the memory list
@@ -93,7 +95,7 @@ struct MemorySettings: Codable, Equatable {
     enum CodingKeys: String, CodingKey {
         case name, recAction, dubMode, quantize, autoRec, countIn, startMode, stopMode, fadeSeconds
         case thumb, oneShot, reverse, loopLevel, rhythmOn, rhythmPattern, rhythmVariation, rhythmKit
-        case rhythmLevel, rhythmReverb, rhythmHumanize, rhythmIntro, rhythmEnding, tempo, loopTempo, stretchMode, loopMeasures, loopLength, savedSeconds
+        case rhythmLevel, rhythmReverb, rhythmHumanize, rhythmIntro, rhythmEnding, tempo, loopTempo, stretchMode, loopMeasures, loopLength, countInBars, clickMode, savedSeconds
     }
 
     static func defaults(for slot: Int) -> MemorySettings {
@@ -137,6 +139,8 @@ extension MemorySettings {
         stretchMode = v(.stretchMode, stretchMode)
         loopMeasures = v(.loopMeasures, loopMeasures)
         loopLength = v(.loopLength, loopLength)
+        countInBars = v(.countInBars, countInBars)
+        clickMode = v(.clickMode, clickMode)
         savedSeconds = v(.savedSeconds, savedSeconds)
         thumb = v(.thumb, thumb)
     }

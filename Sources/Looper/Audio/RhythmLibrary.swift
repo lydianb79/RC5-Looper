@@ -178,15 +178,107 @@ enum RhythmLibrary {
         PatternDef("Metronome 3/4", "Metronome", sig: "3/4", beats: 3, steps: 6, tempo: 120, ["P": "x.o.o."], b: ["P": "x.o.o.", "Z": "go"]),
         PatternDef("Metronome 2/4", "Metronome", sig: "2/4", beats: 2, steps: 4, tempo: 120, ["P": "x.o."], b: ["P": "x.o.", "Z": "go"]),
         PatternDef("Metronome 6/8", "Metronome", sig: "6/8", beats: 3, steps: 6, tempo: 90, ["P": "xooxoo"], b: ["P": "xooxoo", "Z": "g"]),
+
+        // ---- added in 2.0 (appended so saved memories keep their pattern numbers) ----
+        // Rock
+        PatternDef("Floor Tom Rock", "Rock", tempo: 112, ["K": "x.......x.x.....", "S": "....x.......x...", "L": "x."]),
+        PatternDef("Surf Rock", "Rock", tempo: 160, ["K": "x...x...x...x...", "S": "....x.......x...", "H": "x.", "T": "..............x."]),
+        PatternDef("Slow Rock 12/8", "Rock", sig: "12/8", steps: 12, tempo: 64, ["K": "x.....x.x...", "S": "...x.....x..", "H": "xxx"]),
+        PatternDef("Stadium", "Rock", tempo: 128, ["K": "x.......x.......", "S": "....x.......x...", "C": "x.......", "H": "..x."]),
+        // Pop
+        PatternDef("Dance Pop", "Pop", tempo: 122, ["K": "x...", "S": "....x.......x...", "A": "....x.......x...", "O": "..x.", "H": "x..."]),
+        PatternDef("Indie Pop", "Pop", tempo: 118, ["K": "x.x...x...x.....", "S": "....x.......x...", "H": "x"]),
+        PatternDef("Pop Shuffle", "Pop", steps: 12, tempo: 100, ["K": "x.....x..x..", "S": "...x.....x..", "H": "x.x"]),
+        PatternDef("Power Ballad", "Pop", tempo: 68, ["K": "x......xx.......", "S": "....x.......x...", "H": "x.x.x.x.x.x.x.xo"]),
+        // Funk
+        PatternDef("Purdie Shuffle", "Funk", steps: 12, tempo: 104, ["K": "x.....x....x", "S": ".g..g.x..g..", "H": "x.x"]),
+        PatternDef("Funk Open Hat", "Funk", tempo: 104, ["K": "x.....x..x.x....", "S": "....x..g.g..x...", "H": "xxxxxxx.xxxxxxx.", "O": ".......x.......x"]),
+        PatternDef("Jazz Funk", "Funk", tempo: 108, ["K": "x..x....x.x.....", "S": "....x..g..g.x...", "R": "x.", "H": "....x.......x..."]),
+        // Soul & Gospel
+        PatternDef("Neo Soul", "Soul", tempo: 84, swing: 0.18, ["K": "x......x..x.....", "S": "....x.......x..g", "H": "x.x.x.xxx.x.x.x."]),
+        PatternDef("Gospel Shuffle", "Soul", steps: 12, tempo: 132, ["K": "x..x..x..x..", "S": "...x.....x..", "H": "x.xx.xx.xx.x"]),
+        PatternDef("Motown Stomp", "Soul", tempo: 120, ["K": "x.x...x.x.x.....", "S": "....x.......x...", "A": "....x.......x...", "Z": "xo"]),
+        PatternDef("Philly Soul", "Soul", tempo: 112, ["K": "x...", "S": "....x.......x...", "H": "x...", "O": "..x."]),
+        PatternDef("Soul Ballad", "Soul", steps: 12, tempo: 58, ["K": "x.....x..x..", "P": "...x.....x..", "H": "xxx"]),
+        // Hip-Hop
+        PatternDef("Lo-Fi", "Hip-Hop", tempo: 82, swing: 0.28, ["K": "x......x..x.....", "S": "....x.......x...", "H": "x.", "Z": "....x.......x..."]),
+        PatternDef("Boom Bap 2", "Hip-Hop", tempo: 92, swing: 0.2, ["K": "x.......x.x..x..", "S": "....x.......x...", "H": "x.", "O": "..............x."]),
+        PatternDef("Trap Rolls", "Hip-Hop", steps: 32, tempo: 140, ["K": "x.............x.....x...........", "A": "................x...............", "H": "x...x...x...x...x...x.x.xxxxx..."]),
+        PatternDef("R&B", "Hip-Hop", tempo: 76, ["K": "x..x......x.....", "S": "....x.......x...", "H": "x", "P": "......x........."]),
+        PatternDef("Dilla Swing", "Hip-Hop", tempo: 88, swing: 0.33, ["K": "x..x.....xx.....", "S": "....x.......x...", "H": "x."]),
+        // World
+        PatternDef("Afrobeat", "World", tempo: 110, ["K": "x.....x...x.x...", "S": "....x.g..g..x.g.", "H": "x.xxx.xxx.xxx.xx"]),
+        PatternDef("Highlife", "World", tempo: 120, ["K": "x..x..x.x..x..x.", "P": "x.x..x.x.x..x...", "H": "..x."]),
+        PatternDef("Bembe 6/8", "World", sig: "6/8", beats: 3, steps: 12, tempo: 100, ["K": "x.....x.....", "P": "x.x.xx.x.x.x", "Z": "xx", "L": "...x.....x.."]),
+        PatternDef("Balkan 7/8", "World", sig: "7/8", beats: 3.5, steps: 14, tempo: 140, ["K": "x.......x.....", "S": "....x.......x.", "H": "x."]),
+        PatternDef("Soca", "World", tempo: 150, ["K": "x...", "S": "....x..x....x..x", "O": "..x.", "H": "x..."]),
+        PatternDef("Second Line", "World", tempo: 100, swing: 0.15, ["K": "x......x..x...x.", "S": "..gx.g.x..gx.g.x"]),
+        // Latin
+        PatternDef("Bolero", "Latin", tempo: 96, ["K": "x.......x.......", "P": "x..xx...x.x.x...", "Z": "xooo", "L": "............x.x."]),
+        PatternDef("Mambo", "Latin", tempo: 180, ["K": "...x..x....x..x.", "R": "x.x.x.xxx.x.x.xx", "P": "..x.x...x..x..x."]),
+        PatternDef("Tango", "Latin", tempo: 120, ["K": "x...x...x...x.x.", "S": "........x.....x."]),
+        PatternDef("Cumbia", "Latin", tempo: 96, ["K": "x...x...x...x...", "P": "..x...x...x...x.", "Z": "x.o."]),
+        PatternDef("Merengue", "Latin", tempo: 140, ["K": "x...x...x...x...", "T": "x.x.xxx.x.x.xxx.", "Z": "xo"]),
+        // Reggae
+        PatternDef("Dub", "Reggae", steps: 12, tempo: 72, ["K": "......x.....", "S": "......x.....", "H": "..x"]),
+        // Jazz
+        PatternDef("Bebop", "Jazz", steps: 12, tempo: 240, ["R": "x..x.xx..x.x", "H": "...x.....x..", "S": "....g.....g.", "K": "g.....g....."]),
+        PatternDef("Brush Waltz", "Jazz", sig: "3/4", beats: 3, steps: 9, tempo: 110, ["Z": "x.xx.xx.x", "S": "...g..g..", "K": "g........"]),
+        PatternDef("Jazz Samba", "Jazz", tempo: 140, ["K": "x..xx..xx..xx..x", "P": "x..x..x...x..x..", "R": "x."]),
+        // Electronic
+        PatternDef("UK Garage", "Electronic", tempo: 132, swing: 0.3, ["K": "x.........x.....", "S": "....x.......x...", "H": "..x.", "Z": "x.x.x.x.xxx.x.x."]),
+        PatternDef("Deep House", "Electronic", tempo: 120, ["K": "x...", "A": "....x.......x...", "O": "..x.", "Z": "x"]),
+        PatternDef("Electro", "Electronic", tempo: 128, ["K": "x.....x...x.....", "A": "....x.......x...", "H": "x.", "P": "..x.....x....x.."]),
+        PatternDef("Jungle", "Electronic", tempo: 170, ["K": "x.........x.....", "S": "....x..x.g..x..g", "H": "x."]),
+        PatternDef("Synthwave", "Electronic", tempo: 108, ["K": "x...", "S": "....x.......x...", "A": "....x.......x...", "H": "x.x."]),
+        // Metal
+        PatternDef("Gallop", "Metal", tempo: 170, ["K": "x.xxx.xxx.xxx.xx", "S": "....x.......x...", "C": "x.......x......."]),
+        PatternDef("Half-Time Metal", "Metal", tempo: 150, ["K": "x.x...x.xx......", "S": "........x.......", "C": "x..."]),
+        // Country
+        PatternDef("Country Rock", "Country", tempo: 140, ["K": "x.......x.x.....", "S": "....x.......x...", "H": "x."]),
+        PatternDef("Polka", "Country", sig: "2/4", beats: 2, steps: 8, tempo: 120, ["K": "x...x...", "S": "..x...x.", "H": "..x...x."]),
+        PatternDef("Bluegrass", "Country", tempo: 180, ["K": "x...x...", "S": "..x...x.", "Z": "x."]),
+        // Blues
+        PatternDef("Chicago Shuffle", "Blues", steps: 12, tempo: 110, ["K": "x..x..x..x..", "S": "...x.....x..", "R": "x.x"]),
+        PatternDef("Boogie", "Blues", steps: 12, tempo: 150, ["K": "x..x..x..x..", "S": "...x.....x..", "H": "x.x"]),
+        // Odd meters
+        PatternDef("9/8 Aksak", "Odd Meter", sig: "9/8", beats: 4.5, steps: 18, tempo: 120, ["K": "x.......x.........", "S": "....x.......x.....", "H": "x."]),
+        PatternDef("11/8 Groove", "Odd Meter", sig: "11/8", beats: 5.5, steps: 22, tempo: 130, ["K": "x.......x.......x.....", "S": "....x.......x.......x.", "H": "x."]),
+        PatternDef("6/4 Groove", "Odd Meter", sig: "6/4", beats: 6, steps: 24, tempo: 110, ["K": "x.......x.x.............", "S": "....x.......x.......x...", "H": "x."]),
     ]
 
+    /// Built-in patterns come first; user patterns (editable copies) follow in fixed slots.
+    static let builtinCount = patterns.count
+    static var patternCount: Int { builtinCount + UserPatternStore.slots }
+    static func isUser(_ i: Int) -> Bool { i >= builtinCount && i < patternCount }
+
+    private static let categoryOrder = ["Rock", "Pop", "Funk", "Soul", "Blues", "Jazz", "Latin", "World", "Reggae",
+                                        "Hip-Hop", "Metal", "Electronic", "Country", "Odd Meter", "Metronome"]
+
     static var categories: [String] {
-        var seen = Set<String>()
-        return patterns.compactMap { seen.insert($0.category).inserted ? $0.category : nil }
+        var cats = categoryOrder.filter { c in patterns.contains { $0.category == c } }
+        for p in patterns where !cats.contains(p.category) { cats.append(p.category) }
+        if UserPatternStore.shared.items.contains(where: { $0 != nil }) { cats.append("User") }
+        return cats
+    }
+
+    /// Pattern indices of a category (built-in or "User").
+    static func indices(in category: String) -> [Int] {
+        if category == "User" {
+            return UserPatternStore.shared.items.indices.filter { UserPatternStore.shared.items[$0] != nil }.map { builtinCount + $0 }
+        }
+        return patterns.indices.filter { patterns[$0].category == category }
     }
 
     static func pattern(_ i: Int) -> PatternDef {
-        patterns[max(0, min(patterns.count - 1, i))]
+        if i >= builtinCount {
+            let slot = i - builtinCount
+            if slot < UserPatternStore.slots, let u = UserPatternStore.shared.items[slot] {
+                return PatternDef(u.name, "User", sig: u.signature, beats: u.beats, steps: u.steps, tempo: u.tempo, swing: u.swing, [:])
+            }
+            return patterns[0]
+        }
+        return patterns[max(0, i)]
     }
 
     // MARK: Table building
@@ -218,8 +310,11 @@ enum RhythmLibrary {
     /// Builds a flat table: [pattern][variation][instrument][step].
     static func buildTable() -> UnsafeMutablePointer<Float> {
         let per = kInstrumentCount * kMaxSteps
-        let table = UnsafeMutablePointer<Float>.allocate(capacity: patterns.count * 2 * per)
-        table.initialize(repeating: 0, count: patterns.count * 2 * per)
+        let table = UnsafeMutablePointer<Float>.allocate(capacity: patternCount * 2 * per)
+        table.initialize(repeating: 0, count: patternCount * 2 * per)
+        for (slot, u) in UserPatternStore.shared.items.enumerated() {
+            if let u { writeUser(u, into: table + (builtinCount + slot) * 2 * per) }
+        }
         for (i, p) in patterns.enumerated() {
             let a = table + (i * 2) * per
             let b = table + (i * 2 + 1) * per
@@ -245,4 +340,62 @@ enum RhythmLibrary {
         }
         return table
     }
+}
+
+extension RhythmLibrary {
+    /// Writes both variations of a user pattern into its table slot ([variation][instrument][step]).
+    static func writeUser(_ u: UserPattern, into dst: UnsafeMutablePointer<Float>) {
+        let per = kInstrumentCount * kMaxSteps
+        dst.update(repeating: 0, count: 2 * per)
+        for (v, grid) in [u.a, u.b].enumerated() {
+            for d in 0..<min(kInstrumentCount, grid.count) {
+                for st in 0..<min(kMaxSteps, grid[d].count) {
+                    dst[v * per + d * kMaxSteps + st] = grid[d][st]
+                }
+            }
+        }
+    }
+}
+
+// MARK: - User patterns
+
+/// An editable pattern: both variations as velocity grids [instrument][step].
+struct UserPattern: Codable, Equatable {
+    var name: String
+    var signature: String
+    var beats: Double
+    var steps: Int
+    var tempo: Double
+    var swing: Double
+    var a: [[Float]]
+    var b: [[Float]]
+}
+
+/// User patterns, stored in ~/Library/Application Support/Looper/UserPatterns.json.
+final class UserPatternStore {
+    static let shared = UserPatternStore()
+    static let slots = 32
+    private(set) var items: [UserPattern?]
+
+    private var url: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Looper", isDirectory: true)
+        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        return base.appendingPathComponent("UserPatterns.json")
+    }
+
+    private init() {
+        items = Array(repeating: nil, count: UserPatternStore.slots)
+        if let data = try? Data(contentsOf: url), let saved = try? JSONDecoder().decode([UserPattern?].self, from: data) {
+            for (i, p) in saved.prefix(UserPatternStore.slots).enumerated() { items[i] = p }
+        }
+    }
+
+    func set(_ slot: Int, _ p: UserPattern?) {
+        guard slot >= 0 && slot < UserPatternStore.slots else { return }
+        items[slot] = p
+        if let data = try? JSONEncoder().encode(items) { try? data.write(to: url, options: .atomic) }
+    }
+
+    var freeSlot: Int? { items.firstIndex { $0 == nil } }
 }

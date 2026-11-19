@@ -25,7 +25,17 @@ struct SetupView: View {
                 Text("With a loop length set, recording stops by itself after that many bars at the current tempo and continues as set in Rec action. None = you close the loop yourself.")
                     .font(.caption).foregroundColor(.secondary)
                 Toggle("Loop quantize (snap loop to whole bars when rhythm is on)", isOn: $looper.settings.quantize)
-                Toggle("Count-in (one bar before recording; metronome clicks when the rhythm is off)", isOn: $looper.settings.countIn)
+                Toggle("Count-in (before recording; metronome clicks when the rhythm is off)", isOn: $looper.settings.countIn)
+                Picker("Count-in length", selection: $looper.settings.countInBars) {
+                    Text("1 bar").tag(1)
+                    Text("2 bars").tag(2)
+                }
+                .pickerStyle(.segmented)
+                Picker("Click when the rhythm is off", selection: $looper.settings.clickMode) {
+                    Text("Count-in only").tag(0)
+                    Text("While recording").tag(1)
+                    Text("Always").tag(2)
+                }
                 Toggle("Auto rec (recording starts when you play)", isOn: $looper.settings.autoRec)
                 if looper.settings.autoRec {
                     LabeledContent("Auto rec threshold") {
@@ -201,7 +211,7 @@ struct RhythmView: View {
     private static let icons: [String: String] = [
         "Rock": "guitars", "Pop": "music.mic", "Funk": "figure.dance", "Blues": "music.note",
         "Jazz": "music.quarternote.3", "Latin": "sun.max", "Reggae": "leaf", "Metal": "bolt",
-        "Electronic": "waveform", "Country": "music.note.house", "Odd Meter": "function", "Metronome": "metronome",
+        "Electronic": "waveform", "Country": "music.note.house", "Odd Meter": "function", "Metronome": "metronome", "Soul": "heart", "Hip-Hop": "headphones", "World": "globe", "User": "person.crop.square",
     ]
 
     var body: some View {
@@ -236,7 +246,7 @@ struct RhythmView: View {
                     Section("Styles") {
                         ForEach(RhythmLibrary.categories, id: \.self) { cat in
                             Label(cat, systemImage: Self.icons[cat] ?? "music.note")
-                                .badge(RhythmLibrary.patterns.filter { $0.category == cat }.count)
+                                .badge(RhythmLibrary.indices(in: cat).count)
                                 .tag(cat)
                         }
                     }
@@ -247,7 +257,7 @@ struct RhythmView: View {
                 // patterns of the style
                 ScrollView {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 12)], spacing: 12) {
-                        ForEach(RhythmLibrary.patterns.indices.filter { RhythmLibrary.patterns[$0].category == category }, id: \.self) { i in
+                        ForEach(RhythmLibrary.indices(in: category), id: \.self) { i in
                             PatternCard(index: i, selected: s.rhythmPattern == i, variation: s.rhythmVariation, core: looper.core)
                                 .onTapGesture { looper.selectPattern(i) }
                         }

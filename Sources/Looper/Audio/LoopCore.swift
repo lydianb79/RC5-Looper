@@ -71,6 +71,10 @@ final class LoopCore {
     var humanize: Float = 0.6
     /// Fixed loop length in bars (0 = free). Recording then ends by itself after that many bars.
     var fixedBars = 0
+    /// Count-in length in bars (1 or 2).
+    var countBars = 1
+    /// Metronome click when the rhythm is off: 0 = only for the count-in, 1 = also while recording / overdubbing, 2 = always.
+    var clickMode = 0
     /// What follows a fixed-length recording (overdub or play).
     var fixedNext: LoopState = .playing
     var inputSampleRate: Double = 0
@@ -294,7 +298,7 @@ final class LoopCore {
                 rhythm.startCount()
             }
             countingIn = true
-            countdown = Int(mf.rounded())
+            countdown = Int((mf * Double(max(1, min(2, countBars)))).rounded())
             state = .armed
             return
         }
@@ -326,7 +330,7 @@ final class LoopCore {
         tailRemaining = 0
         recComp = latencyFrames
         recordedWithRhythm = rhythmOn
-        recordedWithCount = countingIn
+        recordedWithCount = countingIn || (clickMode > 0 && !rhythmOn)
         countingIn = false
         loopLength = 0
         currentLayer = -1
@@ -934,7 +938,12 @@ final class LoopCore {
             // the rhythm engine also runs for the metronome count-in when the rhythm itself is off
             // Without a loop the rhythm only plays when started (rhythmPreview); with a loop it follows the transport.
             let waiting = state == .empty || state == .autoRecArmed
-            let rActive = (rhythmOn && state != .stopped && (!waiting || rhythmPreview)) || (state == .armed && countingIn)
+            var click = false
+            if !rhythmOn && clickMode > 0 {
+                click = state == .recording || state == .overdubbing || (clickMode == 2 && state == .playing)
+                if click && rhythm.mode != .count { rhythm.startCount() }
+            }
+            let rActive = (rhythmOn && state != .stopped && (!waiting || rhythmPreview)) || (state == .armed && countingIn) || click
             let rs: (Float, Float) = rActive ? rhythm.tick() : rhythm.tail()
             if rActive { rhythmWasRunning = true }
             if endingPending && rhythm.consumeEndingDone() {
@@ -944,7 +953,8 @@ final class LoopCore {
                 gainTarget = 0
                 gainStep = Float(1.0 / (0.012 * sampleRate))
             }
-            let rg: Float = (state == .playing || state == .overdubbing) ? gain : 1
+            var rg: Float = (state == .playing || state == .overdubbing) ? gain : 1
+            if click { rg *= 0.55 }
 
             var oL = lpL * lvl + rs.0 * rl * rg
             var oR = lpR * lvl + rs.1 * rl * rg

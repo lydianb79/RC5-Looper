@@ -128,6 +128,10 @@ struct StudioView: View {
                              set: { looper.renamingSlot = $0?.id })) { target in
             RenameSheet(slot: target.id).environmentObject(looper)
         }
+        .sheet(item: Binding(get: { looper.renamingPattern.map { RenameTarget(id: $0) } },
+                             set: { looper.renamingPattern = $0?.id })) { target in
+            PatternRenameSheet(index: target.id).environmentObject(looper)
+        }
         .overlay(alignment: .top) {
             if let msg = looper.message {
                 Text(msg)
@@ -973,7 +977,7 @@ private struct RhythmPanel: View {
                         ForEach(RhythmLibrary.categories, id: \.self) { cat in
                             let selected = pattern.category == cat
                             Button(cat) {
-                                if let i = RhythmLibrary.patterns.firstIndex(where: { $0.category == cat }) { looper.selectPattern(i) }
+                                if let i = RhythmLibrary.indices(in: cat).first { looper.selectPattern(i) }
                             }
                             .buttonStyle(ChipButtonStyle(selected: selected))
                             .fixedSize()
@@ -985,11 +989,19 @@ private struct RhythmPanel: View {
             HStack(spacing: 10) {
                 Menu {
                     ForEach(RhythmLibrary.categories, id: \.self) { cat in
-                        Section(cat) {
-                            ForEach(RhythmLibrary.patterns.indices.filter { RhythmLibrary.patterns[$0].category == cat }, id: \.self) { i in
-                                Button("\(RhythmLibrary.patterns[i].name)  ·  \(RhythmLibrary.patterns[i].signature)") { looper.selectPattern(i) }
+                        Menu(cat) {
+                            ForEach(RhythmLibrary.indices(in: cat), id: \.self) { i in
+                                let pd = RhythmLibrary.pattern(i)
+                                Button((i == s.rhythmPattern ? "✓ " : "") + "\(pd.name)  ·  \(pd.signature)") { looper.selectPattern(i) }
                             }
                         }
+                    }
+                    Divider()
+                    Button("Save as New Pattern") { looper.forkPattern() }
+                    if looper.currentIsUserPattern {
+                        Button("Rename Pattern…") { looper.renamingPattern = s.rhythmPattern }
+                        Button("Clear Variation \(s.rhythmVariation == 0 ? "A" : "B")") { looper.clearPatternVariation() }
+                        Button("Delete Pattern") { looper.deleteUserPattern(s.rhythmPattern) }
                     }
                 } label: {
                     Text("\(pattern.name) · \(pattern.signature)")
@@ -1013,6 +1025,8 @@ private struct RhythmPanel: View {
                 .labelsHidden()
                 .frame(width: 90)
                 Spacer(minLength: 8)
+                ToggleChip(title: "Edit", isOn: $looper.editingPattern)
+                    .help("Edit the pattern: click steps to cycle accent → normal → ghost → off. Built-in patterns are copied to your User patterns first.")
                 ToggleChip(title: "Intro", isOn: $looper.settings.rhythmIntro)
                 ToggleChip(title: "Ending", isOn: $looper.settings.rhythmEnding)
                 ToggleChip(title: "Count-in", isOn: $looper.settings.countIn)
@@ -1033,8 +1047,16 @@ private struct RhythmPanel: View {
                 }
                 Spacer(minLength: 0)
             }
+            if looper.editingPattern {
+                Text(looper.currentIsUserPattern
+                     ? "Editing \(pattern.name), variation \(s.rhythmVariation == 0 ? "A" : "B"): click a step to cycle accent → normal → ghost → off."
+                     : "Click a step to start editing: \(pattern.name) is copied to your User patterns first.")
+                    .font(.system(size: 11))
+                    .foregroundColor(UI.muted)
+            }
             StepGrid(pattern: s.rhythmPattern, variation: s.rhythmVariation, on: s.rhythmOn,
-                     step: looper.snapshot.rhythmStep, names: Self.drumNames, core: looper.core)
+                     step: looper.snapshot.rhythmStep, names: Self.drumNames, core: looper.core,
+                     editing: looper.editingPattern, version: looper.patternsVersion) { d, i in looper.toggleCell(drum: d, step: i) }
         }
         .padding(16)
         .background(RoundedRectangle(cornerRadius: 14).fill(UI.panel))
@@ -1049,12 +1071,15 @@ private struct StepGrid: View {
     let step: Int
     let names: [String]
     let core: LoopCore
+    var editing = false
+    var version = 0
+    var onTap: (Int, Int) -> Void = { _, _ in }
 
     var body: some View {
         let p = RhythmLibrary.pattern(pattern)
         let steps = max(1, min(kMaxSteps, p.steps))
         let spb = max(1, Int((Double(steps) / max(0.5, p.beats)).rounded()))
-        let rows = (0..<kInstrumentCount).filter { d in
+        let rows = editing ? Array(0..<kInstrumentCount) : (0..<kInstrumentCount).filter { d in
             (0..<steps).contains { core.rhythm.cell(pattern: pattern, variation: 0, drum: d, step: $0) > 0 ||
                 core.rhythm.cell(pattern: pattern, variation: 1, drum: d, step: $0) > 0 }
         }
@@ -1067,6 +1092,8 @@ private struct StepGrid: View {
                         .frame(width: 64, alignment: .leading)
                     ForEach(0..<steps, id: \.self) { i in
                         cell(d: d, i: i, spb: spb)
+                            .contentShape(Rectangle())
+                            .onTapGesture { if editing { onTap(d, i) } }
                     }
                 }
             }
@@ -1084,7 +1111,7 @@ private struct StepGrid: View {
         RoundedRectangle(cornerRadius: 5)
             .fill(current && hit ? Color.white : base)
             .frame(height: 22)
-            .overlay(RoundedRectangle(cornerRadius: 5).stroke(current ? (hit ? Color.white : UI.dim) : Color.clear, lineWidth: 2))
+            .overlay(RoundedRectangle(cornerRadius: 5).stroke(current ? (hit ? Color.white : UI.dim) : (editing ? UI.line2 : Color.clear), lineWidth: current ? 2 : 1))
             .shadow(color: current && hit ? UI.base : .clear, radius: 6)
     }
 }
@@ -1105,11 +1132,6 @@ private struct StudioFooter: View {
             } else if looper.midiClockOut {
                 Label("MIDI clock out", systemImage: "dot.radiowaves.left.and.right")
             }
-            SettingsButton(looper: looper, tab: .audio) {
-                Text("Settings ⌘,")
-            }
-            .buttonStyle(.plain)
-            .foregroundColor(UI.text2)
         }
         .font(.system(size: 11))
         .foregroundColor(UI.muted)
@@ -1307,6 +1329,35 @@ private struct RenameSheet: View {
 
     private func commit() {
         looper.renameMemory(slot, to: name)
+        dismiss()
+    }
+}
+
+private struct PatternRenameSheet: View {
+    @EnvironmentObject var looper: LooperController
+    @Environment(\.dismiss) private var dismiss
+    let index: Int
+    @State private var name = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Rename pattern").font(.headline)
+            TextField("Name", text: $name)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 300)
+                .onSubmit { commit() }
+            HStack {
+                Spacer()
+                Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Rename") { commit() }.keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .onAppear { name = RhythmLibrary.pattern(index).name }
+    }
+
+    private func commit() {
+        looper.renameUserPattern(index, to: name)
         dismiss()
     }
 }

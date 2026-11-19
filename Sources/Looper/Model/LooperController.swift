@@ -51,6 +51,12 @@ final class LooperController: ObservableObject {
     @Published var showRhythm: Bool = UserDefaults.standard.object(forKey: "showRhythm") as? Bool ?? true {
         didSet { UserDefaults.standard.set(showRhythm, forKey: "showRhythm") }
     }
+    /// Pattern editor: grid cells become clickable.
+    @Published var editingPattern = false
+    /// Bumped whenever a user pattern changes (refreshes the grid and menus).
+    @Published var patternsVersion = 0
+    /// User pattern slot whose rename sheet is open.
+    @Published var renamingPattern: Int?
     /// Memory slot whose rename sheet is open.
     @Published var renamingSlot: Int?
     @Published private(set) var audioStatus = "Starting audio…"
@@ -289,13 +295,16 @@ final class LooperController: ObservableObject {
         c.reverse = settings.reverse
         c.loopLevel = Float(settings.loopLevel)
         c.rhythmOn = settings.rhythmOn
-        c.patternIndex = settings.rhythmPattern
+        let pi = settings.rhythmPattern
+        c.patternIndex = RhythmLibrary.isUser(pi) && UserPatternStore.shared.items[pi - RhythmLibrary.builtinCount] == nil ? 0 : pi
         c.variation = settings.rhythmVariation
         c.kitIndex = settings.rhythmKit
         c.rhythmLevel = Float(settings.rhythmLevel)
         c.reverbLevel = Float(settings.rhythmReverb)
         c.humanize = Float(settings.rhythmHumanize)
         c.fixedBars = settings.loopLength
+        c.countBars = settings.countInBars
+        c.clickMode = settings.clickMode
         c.fixedNext = settings.recAction == .recDubPlay && !settings.oneShot ? .overdubbing : .playing
         c.stretchMode = settings.stretchMode
         c.tempo = settings.tempo

@@ -48,17 +48,31 @@ final class RhythmEngine {
         self.sampleRate = sampleRate
         synth = DrumSynth(sampleRate: sampleRate)
         let defs = RhythmLibrary.patterns
-        patternCount = defs.count
+        let count = RhythmLibrary.patternCount
+        patternCount = count
         table = RhythmLibrary.buildTable()
-        steps = .allocate(capacity: defs.count)
-        beats = .allocate(capacity: defs.count)
-        swing = .allocate(capacity: defs.count)
-        feelKind = .allocate(capacity: defs.count)
+        steps = .allocate(capacity: count)
+        beats = .allocate(capacity: count)
+        swing = .allocate(capacity: count)
+        feelKind = .allocate(capacity: count)
+        for i in 0..<count {
+            steps[i] = 16
+            beats[i] = 4
+            swing[i] = 0
+            feelKind[i] = 0
+        }
         for (i, p) in defs.enumerated() {
             steps[i] = max(1, p.steps)
             beats[i] = p.beats
             swing[i] = p.swing
             feelKind[i] = p.category == "Metronome" ? 2 : (p.category == "Electronic" ? 1 : 0)
+        }
+        for (slot, u) in UserPatternStore.shared.items.enumerated() {
+            guard let u else { continue }
+            let i = RhythmLibrary.builtinCount + slot
+            steps[i] = max(1, min(kMaxSteps, u.steps))
+            beats[i] = max(0.5, u.beats)
+            swing[i] = u.swing
         }
         configure(tempo: 120, pattern: 0, variation: 0, kit: 0, reverb: 0.2, humanize: 0.6)
         reset()
@@ -70,6 +84,28 @@ final class RhythmEngine {
     func cell(pattern: Int, variation: Int, drum: Int, step: Int) -> Float {
         guard pattern >= 0 && pattern < patternCount, drum >= 0 && drum < kInstrumentCount, step >= 0 && step < kMaxSteps else { return 0 }
         return table[((pattern * 2 + (variation == 0 ? 0 : 1)) * kInstrumentCount + drum) * kMaxSteps + step]
+    }
+
+    /// Pattern editor: sets one grid cell (main thread; a single float store is safe for the audio thread).
+    func setCell(pattern: Int, variation: Int, drum: Int, step: Int, value: Float) {
+        guard pattern >= 0 && pattern < patternCount, drum >= 0 && drum < kInstrumentCount, step >= 0 && step < kMaxSteps else { return }
+        table[((pattern * 2 + (variation == 0 ? 0 : 1)) * kInstrumentCount + drum) * kMaxSteps + step] = value
+    }
+
+    /// Loads (or clears) a user pattern slot.
+    func loadUser(slot: Int, _ u: UserPattern?) {
+        let i = RhythmLibrary.builtinCount + slot
+        guard i >= RhythmLibrary.builtinCount && i < patternCount else { return }
+        let per = kInstrumentCount * kMaxSteps
+        if let u {
+            RhythmLibrary.writeUser(u, into: table + i * 2 * per)
+            steps[i] = max(1, min(kMaxSteps, u.steps))
+            beats[i] = max(0.5, u.beats)
+            swing[i] = u.swing
+        } else {
+            (table + i * 2 * per).update(repeating: 0, count: 2 * per)
+        }
+        if i == curPattern { curTempo = 0 }      // re-derive the step timing on the next configure
     }
 
     func configure(tempo: Double, pattern: Int, variation: Int, kit: Int, reverb: Float, humanize h: Float = 0.6) {
