@@ -28,7 +28,8 @@ jobs:
 
       - name: Compile check
         if: ${{ inputs.check_only }}
-        run: swift build 2>&1 | grep -E "error|warning: unre|Compiling|Build complete" | head -200; swift build
+        run: |
+          swift build
 
       - name: Build arm64 and x86_64
         if: ${{ !inputs.check_only }}
