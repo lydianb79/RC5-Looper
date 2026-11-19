@@ -66,10 +66,10 @@ Looper turns your Mac and an audio interface into a loop station. Record a phras
 
 ## Getting started
 
-1. **Download** `Looper-2.0-arm64.zip` (Apple silicon) or `Looper-2.0-x86_64.zip` (Intel) from the [latest release](https://github.com/lydianb79/RC5-Looper/releases/latest), or **build the apps** yourself (see [Build it yourself](#build-it-yourself)), and open **Looper (arm64).app** on Apple silicon or **Looper (x86_64).app** on an Intel Mac. The apps are ad-hoc signed: the first time, right-click → **Open**.
+1. **Download** `Looper-2.0.2-arm64.zip` (Apple silicon) or `Looper-2.0.2-x86_64.zip` (Intel) from the [latest release](https://github.com/lydianb79/RC5-Looper/releases/latest), or **build the apps** yourself (see [Build it yourself](#build-it-yourself)), and open **Looper (arm64).app** on Apple silicon or **Looper (x86_64).app** on an Intel Mac. The apps are ad-hoc signed: the first time, right-click → **Open**.
 2. Allow **microphone access** when macOS asks.
 3. Open **Settings › Audio** (⌘,) and choose your interface, mono or stereo input, the output pair and the buffer size. Use headphones or monitors – the built-in mic and speakers feed back into the loop.
-4. Optional: switch the **Rhythm** on and pick a style, or turn on **Count-in**.
+4. Optional: switch the **Rhythm** on (the switch in the rhythm panel) and pick a style, tick **Count-in**, or click **FREE** in the display to set a fixed loop length.
 5. Press **R** (or click **Record**) and play. Press **R** again to close the loop – it plays (or goes straight into overdub, depending on *Rec action*).
 6. Press **R** to overdub, **Space** to stop and start, **⌘Z** to undo, **2**–**5** to record tracks 2–5.
 7. **⌘S** writes everything into the current memory.
