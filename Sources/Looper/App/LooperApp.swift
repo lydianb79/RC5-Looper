@@ -89,10 +89,13 @@ struct LooperCommands: Commands {
             // Themes are listed directly in the View menu: SwiftUI submenus in the menu bar
             // don't respond reliably on every macOS version.
             Text("Theme")
-            ForEach(AppTheme.allCases) { t in
-                Button((themeName == t.rawValue ? "✓  " : "     ") + t.label) { looper.appTheme = t }
-                    .keyboardShortcut(KeyEquivalent(Character(String((AppTheme.allCases.firstIndex(of: t) ?? 0) + 1))),
-                                      modifiers: [.control, .command])
+            ForEach(Array(AppTheme.allCases.enumerated()), id: \.element) { i, t in
+                if i < 9 {
+                    Button((themeName == t.rawValue ? "✓  " : "     ") + t.label) { looper.appTheme = t }
+                        .keyboardShortcut(KeyEquivalent(Character(String(i + 1))), modifiers: [.control, .command])
+                } else {
+                    Button((themeName == t.rawValue ? "✓  " : "     ") + t.label) { looper.appTheme = t }
+                }
             }
             Divider()
         }

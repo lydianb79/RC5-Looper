@@ -4,6 +4,7 @@ import SwiftUI
 /// (panels, header, display, controls, grid), the text colours and the accent.
 enum AppTheme: String, CaseIterable, Identifiable {
     case graphite, midnight, synthwave, aurora, ember, ocean, forest, daylight
+    case sunset, cyberpunk, terminal, sakura, arctic, vintage
 
     var id: String { rawValue }
 
@@ -17,11 +18,17 @@ enum AppTheme: String, CaseIterable, Identifiable {
         case .ocean: return "Ocean"
         case .forest: return "Forest"
         case .daylight: return "Daylight"
+        case .sunset: return "Sunset"
+        case .cyberpunk: return "Neon City"
+        case .terminal: return "Terminal"
+        case .sakura: return "Sakura"
+        case .arctic: return "Arctic"
+        case .vintage: return "Vintage Tape"
         }
     }
 
     /// Background artwork.
-    enum Art { case dots, stars, synthGrid, aurora, embers, waves, hills, paper }
+    enum Art { case dots, stars, synthGrid, aurora, embers, waves, hills, paper, mountains, cityRain, codeRain, petals, snow, tape }
 
     struct Palette {
         let art: Art
@@ -142,6 +149,72 @@ enum AppTheme: String, CaseIterable, Identifiable {
                            line: Color(hex: 0xD5DBE5), line2: Color(hex: 0xC4CCD9),
                            text: Color(hex: 0x111827), text2: Color(hex: 0x374151), muted: Color(hex: 0x6B7280),
                            accent: Color(hex: 0x2563EB), selection: Color(hex: 0x2563EB), base: Color(hex: 0x4F46E5))
+        case .sunset:
+            return Palette(art: .mountains, light: false,
+                           bgTop: Color(hex: 0x2B1055), bgMid: Color(hex: 0xC2410C), bgBottom: Color(hex: 0x1A0B1E),
+                           glowA: Color(hex: 0xFB7185, opacity: 0.35), glowB: Color(hex: 0xFBBF24, opacity: 0.30),
+                           artColor: Color(hex: 0xFFD166), artColor2: Color(hex: 0x2A0F2E),
+                           panel: Color(hex: 0x2A1028, opacity: 0.74), header: Color(hex: 0x2A0F2A, opacity: 0.90),
+                           lcd: Color(hex: 0x14060F), control: Color(hex: 0x4A1D3C), controlHi: Color(hex: 0x5C2549),
+                           well: Color(hex: 0x3A1531), wellAlt: Color(hex: 0x321229), track: Color(hex: 0x642A50), dim: Color(hex: 0xA8648A),
+                           line: Color(hex: 0x55213F), line2: Color(hex: 0x6E2C52),
+                           text: Color(hex: 0xFFF3EA), text2: Color(hex: 0xF8C9B4), muted: Color(hex: 0xC98F98),
+                           accent: Color(hex: 0xFF8C42), selection: Color(hex: 0xB4235A), base: Color(hex: 0xFFD166))
+        case .cyberpunk:
+            return Palette(art: .cityRain, light: false,
+                           bgTop: Color(hex: 0x05060F), bgMid: Color(hex: 0x0A0F24), bgBottom: Color(hex: 0x020205),
+                           glowA: Color(hex: 0xFCEE0A, opacity: 0.16), glowB: Color(hex: 0x00F0FF, opacity: 0.26),
+                           artColor: Color(hex: 0x00F0FF), artColor2: Color(hex: 0xFCEE0A),
+                           panel: Color(hex: 0x0A0D1C, opacity: 0.78), header: Color(hex: 0x0B0E1F, opacity: 0.92),
+                           lcd: Color(hex: 0x020309), control: Color(hex: 0x161C38), controlHi: Color(hex: 0x1F2750),
+                           well: Color(hex: 0x10152C), wellAlt: Color(hex: 0x0D1124), track: Color(hex: 0x2A3463), dim: Color(hex: 0x5A6AA0),
+                           line: Color(hex: 0x1E2650), line2: Color(hex: 0x2C376E),
+                           text: Color(hex: 0xF1FBFF), text2: Color(hex: 0xB9D7E6), muted: Color(hex: 0x7C93AE),
+                           accent: Color(hex: 0xFCEE0A), selection: Color(hex: 0x00808A), base: Color(hex: 0x00F0FF))
+        case .terminal:
+            return Palette(art: .codeRain, light: false,
+                           bgTop: Color(hex: 0x020A04), bgMid: Color(hex: 0x010603), bgBottom: Color(hex: 0x000200),
+                           glowA: Color(hex: 0x22FF66, opacity: 0.12), glowB: Color(hex: 0x00AA44, opacity: 0.14),
+                           artColor: Color(hex: 0x33FF77), artColor2: Color(hex: 0xB6FFC9),
+                           panel: Color(hex: 0x031008, opacity: 0.86), header: Color(hex: 0x041209, opacity: 0.94),
+                           lcd: Color(hex: 0x010502), control: Color(hex: 0x0A2414), controlHi: Color(hex: 0x0F301B),
+                           well: Color(hex: 0x071A0E), wellAlt: Color(hex: 0x05140B), track: Color(hex: 0x14432A), dim: Color(hex: 0x2F8A52),
+                           line: Color(hex: 0x0E3320), line2: Color(hex: 0x16492D),
+                           text: Color(hex: 0xC8FFD8), text2: Color(hex: 0x7EE6A0), muted: Color(hex: 0x3FA866),
+                           accent: Color(hex: 0x33FF77), selection: Color(hex: 0x0B6B2E), base: Color(hex: 0x9DFFB9))
+        case .sakura:
+            return Palette(art: .petals, light: false,
+                           bgTop: Color(hex: 0x2A1024), bgMid: Color(hex: 0x1C0B19), bgBottom: Color(hex: 0x0C050B),
+                           glowA: Color(hex: 0xF9A8D4, opacity: 0.30), glowB: Color(hex: 0xC084FC, opacity: 0.20),
+                           artColor: Color(hex: 0xFBCFE8), artColor2: Color(hex: 0xF472B6),
+                           panel: Color(hex: 0x24101F, opacity: 0.76), header: Color(hex: 0x250F20, opacity: 0.90),
+                           lcd: Color(hex: 0x10060D), control: Color(hex: 0x3D1A34), controlHi: Color(hex: 0x4D2242),
+                           well: Color(hex: 0x30142A), wellAlt: Color(hex: 0x2A1124), track: Color(hex: 0x58284C), dim: Color(hex: 0xA4709A),
+                           line: Color(hex: 0x4A1F40), line2: Color(hex: 0x622A55),
+                           text: Color(hex: 0xFFF0F7), text2: Color(hex: 0xF5C2DC), muted: Color(hex: 0xC48FAE),
+                           accent: Color(hex: 0xF472B6), selection: Color(hex: 0x9D174D), base: Color(hex: 0xFBCFE8))
+        case .arctic:
+            return Palette(art: .snow, light: true,
+                           bgTop: Color(hex: 0xDCEBF7), bgMid: Color(hex: 0xEEF5FB), bgBottom: Color(hex: 0xC9DCEB),
+                           glowA: Color(hex: 0x7DD3FC, opacity: 0.45), glowB: Color(hex: 0xA5B4FC, opacity: 0.40),
+                           artColor: Color(hex: 0xFFFFFF), artColor2: Color(hex: 0x94B8D6),
+                           panel: Color(hex: 0xF7FBFF, opacity: 0.80), header: Color(hex: 0xF5FAFF, opacity: 0.90),
+                           lcd: Color(hex: 0xE2EDF6), control: Color(hex: 0xDDE9F3), controlHi: Color(hex: 0xCFDFEC),
+                           well: Color(hex: 0xE8F1F8), wellAlt: Color(hex: 0xDFEAF3), track: Color(hex: 0xBACFE0), dim: Color(hex: 0x8AA4BA),
+                           line: Color(hex: 0xC8D9E7), line2: Color(hex: 0xB4C9DB),
+                           text: Color(hex: 0x0B2135), text2: Color(hex: 0x2C4A63), muted: Color(hex: 0x5F7C94),
+                           accent: Color(hex: 0x0284C7), selection: Color(hex: 0x0284C7), base: Color(hex: 0x0369A1))
+        case .vintage:
+            return Palette(art: .tape, light: true,
+                           bgTop: Color(hex: 0xEADBC0), bgMid: Color(hex: 0xE2CFAE), bgBottom: Color(hex: 0xC9B08A),
+                           glowA: Color(hex: 0xFFF3D6, opacity: 0.6), glowB: Color(hex: 0xB45309, opacity: 0.18),
+                           artColor: Color(hex: 0x7C4A1E), artColor2: Color(hex: 0xC2410C),
+                           panel: Color(hex: 0xF6ECD8, opacity: 0.88), header: Color(hex: 0x3B2A1A, opacity: 0.94),
+                           lcd: Color(hex: 0x2B1E12), control: Color(hex: 0xE9DABD), controlHi: Color(hex: 0xDDCBA8),
+                           well: Color(hex: 0xEFE2C8), wellAlt: Color(hex: 0xE6D6B8), track: Color(hex: 0xCDB58E), dim: Color(hex: 0xA48B66),
+                           line: Color(hex: 0xD5BF98), line2: Color(hex: 0xC4AB80),
+                           text: Color(hex: 0x2B1B0E), text2: Color(hex: 0x5A3E24), muted: Color(hex: 0x8A6C4C),
+                           accent: Color(hex: 0xC2410C), selection: Color(hex: 0xC2410C), base: Color(hex: 0x9A3412))
         }
     }
 }
@@ -173,10 +246,11 @@ struct ThemeBackground: View {
 /// Theme artwork, slowly animated where it helps the mood (stars, aurora, embers, waves).
 private struct ThemeArt: View {
     let palette: AppTheme.Palette
+    static let glyphs = Array("0123456789ABCDEFアカサタナハマヤラワ#$%&*+<>=")
 
     var body: some View {
         switch palette.art {
-        case .stars, .aurora, .embers, .waves, .synthGrid:
+        case .stars, .aurora, .embers, .waves, .synthGrid, .cityRain, .codeRain, .petals, .snow:
             TimelineView(.animation(minimumInterval: 1.0 / 15.0)) { tl in
                 let t = tl.date.timeIntervalSinceReferenceDate
                 Canvas { ctx, size in draw(&ctx, size, t) }
@@ -369,6 +443,150 @@ private struct ThemeArt: View {
                         ctx.fill(tree, with: .color(layer.1.opacity(layer.2)))
                     }
                 }
+            }
+
+        case .mountains:
+            let sunC = CGPoint(x: w * 0.62, y: h * 0.5)
+            ctx.fill(Path(ellipseIn: CGRect(x: sunC.x - 400, y: sunC.y - 400, width: 800, height: 800)),
+                     with: .radialGradient(Gradient(colors: [p.artColor.opacity(0.35), .clear]), center: sunC, startRadius: 60, endRadius: 400))
+            ctx.fill(Path(ellipseIn: CGRect(x: sunC.x - 70, y: sunC.y - 70, width: 140, height: 140)), with: .color(p.artColor.opacity(0.9)))
+            let ranges: [(CGFloat, Double, Double)] = [(0.52, 0.55, 0.7), (0.62, 0.8, 1.1), (0.74, 1.0, 1.6)]
+            for (ri, r) in ranges.enumerated() {
+                var path = Path()
+                path.move(to: CGPoint(x: 0, y: h))
+                let steps = 24
+                for s in 0...steps {
+                    let x = w * CGFloat(s) / CGFloat(steps)
+                    let peak = rand(s, 80 + ri) * 120 * CGFloat(r.2)
+                    path.addLine(to: CGPoint(x: x, y: h * r.0 - peak + (s % 2 == 0 ? 30 : 0)))
+                }
+                path.addLine(to: CGPoint(x: w, y: h))
+                path.closeSubpath()
+                ctx.fill(path, with: .color(p.artColor2.opacity(r.1)))
+            }
+
+        case .cityRain:
+            // skyline
+            var x: CGFloat = 0
+            var k = 0
+            while x < w {
+                let bw = 40 + rand(k, 90) * 90
+                let bh = h * (0.25 + rand(k, 91) * 0.4)
+                let rect = CGRect(x: x, y: h - bh, width: bw - 6, height: bh)
+                ctx.fill(Path(rect), with: .color(Color(hex: 0x070A18)))
+                // lit windows
+                var wy = rect.minY + 10
+                var row = 0
+                while wy < h - 10 {
+                    var wx = rect.minX + 6
+                    var col = 0
+                    while wx < rect.maxX - 8 {
+                        if rand(k * 97 + row * 13 + col, 92) > 0.72 {
+                            let c = rand(k + row + col, 93) > 0.5 ? p.artColor : p.artColor2
+                            ctx.fill(Path(CGRect(x: wx, y: wy, width: 4, height: 6)), with: .color(c.opacity(0.55)))
+                        }
+                        wx += 10
+                        col += 1
+                    }
+                    wy += 14
+                    row += 1
+                }
+                x += bw
+                k += 1
+            }
+            // rain
+            for i in 0..<160 {
+                let f = (Double(rand(i, 94)) + t * (0.6 + Double(rand(i, 95)) * 0.5)).truncatingRemainder(dividingBy: 1)
+                let rx = rand(i, 96) * (w + 200) - CGFloat(f) * 120
+                let ry = h * CGFloat(f)
+                var l = Path()
+                l.move(to: CGPoint(x: rx, y: ry))
+                l.addLine(to: CGPoint(x: rx - 6, y: ry + 22))
+                ctx.stroke(l, with: .color(p.artColor.opacity(0.22)), lineWidth: 1)
+            }
+
+        case .codeRain:
+            let colW: CGFloat = 26
+            let cols = Int(w / colW) + 1
+            for c in 0..<cols {
+                let speed = 0.08 + Double(rand(c, 101)) * 0.18
+                let head = (Double(rand(c, 102)) + t * speed).truncatingRemainder(dividingBy: 1.4) * Double(h)
+                let len = 6 + Int(rand(c, 103) * 10)
+                for j in 0..<len {
+                    let y = CGFloat(head) - CGFloat(j) * 18
+                    if y < -18 || y > h { continue }
+                    let glyph = Int(rand(c * 31 + j + Int(t * 2), 104) * 36)
+                    let ch = String(ThemeArt.glyphs[glyph % ThemeArt.glyphs.count])
+                    let a = j == 0 ? 0.9 : 0.45 * (1 - Double(j) / Double(len))
+                    ctx.draw(Text(ch).font(.system(size: 13, design: .monospaced)).foregroundColor((j == 0 ? p.artColor2 : p.artColor).opacity(a)),
+                             at: CGPoint(x: CGFloat(c) * colW + 9, y: y))
+                }
+            }
+
+        case .petals:
+            // a branch
+            var br = Path()
+            br.move(to: CGPoint(x: w + 20, y: h * 0.05))
+            br.addQuadCurve(to: CGPoint(x: w * 0.55, y: h * 0.22), control: CGPoint(x: w * 0.78, y: h * 0.02))
+            ctx.stroke(br, with: .color(Color(hex: 0x3B1A2C)), style: StrokeStyle(lineWidth: 10, lineCap: .round))
+            for i in 0..<26 {
+                let f = CGFloat(i) / 26
+                let bx = w + 20 - (w * 0.45 + 20) * f + (rand(i, 110) - 0.5) * 40
+                let by = h * 0.05 + h * 0.17 * f - 30 * sin(f * .pi) + (rand(i, 111) - 0.5) * 40
+                let r = 8 + rand(i, 112) * 10
+                ctx.fill(Path(ellipseIn: CGRect(x: bx - r, y: by - r, width: 2 * r, height: 2 * r)), with: .color(p.artColor.opacity(0.55)))
+            }
+            for i in 0..<70 {
+                let speed = 0.025 + Double(rand(i, 113)) * 0.04
+                let f = (Double(rand(i, 114)) + t * speed).truncatingRemainder(dividingBy: 1)
+                let x = rand(i, 115) * w - CGFloat(f) * w * 0.3 + CGFloat(sin(t * 0.8 + Double(i)) * 20)
+                let y = h * CGFloat(f)
+                let s = 5 + rand(i, 116) * 6
+                var g = ctx
+                g.translateBy(x: x, y: y)
+                g.rotate(by: .radians(t * 0.8 + Double(i)))
+                g.fill(Path(ellipseIn: CGRect(x: -s, y: -s * 0.45, width: 2 * s, height: s * 0.9)),
+                       with: .color((i % 3 == 0 ? p.artColor2 : p.artColor).opacity(0.7)))
+            }
+
+        case .snow:
+            var hill = Path()
+            hill.move(to: CGPoint(x: 0, y: h))
+            hill.addLine(to: CGPoint(x: 0, y: h * 0.78))
+            hill.addQuadCurve(to: CGPoint(x: w * 0.55, y: h * 0.74), control: CGPoint(x: w * 0.25, y: h * 0.66))
+            hill.addQuadCurve(to: CGPoint(x: w, y: h * 0.7), control: CGPoint(x: w * 0.8, y: h * 0.82))
+            hill.addLine(to: CGPoint(x: w, y: h))
+            hill.closeSubpath()
+            ctx.fill(hill, with: .color(.white.opacity(0.7)))
+            for i in 0..<140 {
+                let speed = 0.02 + Double(rand(i, 120)) * 0.04
+                let f = (Double(rand(i, 121)) + t * speed).truncatingRemainder(dividingBy: 1)
+                let x = rand(i, 122) * w + CGFloat(sin(t * 0.6 + Double(i)) * 24)
+                let y = h * CGFloat(f)
+                let s = 2 + rand(i, 123) * 4
+                ctx.fill(Path(ellipseIn: CGRect(x: x, y: y, width: s, height: s)), with: .color(p.artColor2.opacity(0.55)))
+            }
+
+        case .tape:
+            // two reels and tape path, like an old tape deck
+            for (cx, cy) in [(w * 0.18, h * 0.78), (w * 0.86, h * 0.2)] {
+                let c = CGPoint(x: cx, y: cy)
+                for ring in 0..<6 {
+                    let r = 60 + CGFloat(ring) * 26
+                    ctx.stroke(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r)),
+                               with: .color(p.artColor.opacity(0.07 + 0.015 * Double(ring))), lineWidth: ring == 5 ? 3 : 1)
+                }
+                for k in 0..<3 {
+                    let a = Double(k) * 2 * .pi / 3
+                    var spoke = Path()
+                    spoke.move(to: c)
+                    spoke.addLine(to: CGPoint(x: c.x + CGFloat(cos(a)) * 50, y: c.y + CGFloat(sin(a)) * 50))
+                    ctx.stroke(spoke, with: .color(p.artColor.opacity(0.15)), lineWidth: 8)
+                }
+            }
+            for k in 0..<5 {
+                let y = h * (0.1 + 0.2 * CGFloat(k))
+                ctx.fill(Path(CGRect(x: 0, y: y, width: w, height: 2)), with: .color(p.artColor2.opacity(0.06)))
             }
 
         case .paper:
