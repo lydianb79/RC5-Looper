@@ -59,7 +59,7 @@ for ARCH in arm64 x86_64; do
   /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION_STR" "$APP/Contents/Info.plist"
   /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(git rev-list --count HEAD 2>/dev/null || echo 1)" "$APP/Contents/Info.plist"
   cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
-  cp Resources/Drums/*.wav "$APP/Contents/Resources/Drums/"
+  cp Resources/Drums/*.caf Resources/Drums/manifest.json "$APP/Contents/Resources/Drums/"
   codesign --force --sign - "$APP"
 
   ZIP="build/Looper-$VERSION-$ARCH.zip"

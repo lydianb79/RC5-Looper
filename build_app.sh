@@ -21,7 +21,7 @@ VERSION_STR=$(grep -o 'static let version = "[^"]*"' Sources/Looper/Model/Looper
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(git rev-list --count HEAD 2>/dev/null || echo 1)" "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 mkdir -p "$APP/Contents/Resources/Drums"
-cp Resources/Drums/*.wav "$APP/Contents/Resources/Drums/"
+cp Resources/Drums/*.caf Resources/Drums/manifest.json "$APP/Contents/Resources/Drums/"
 
 # Ad-hoc signature so macOS keeps the microphone permission between launches.
 codesign --force --sign - "$APP"

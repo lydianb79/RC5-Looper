@@ -5,11 +5,11 @@ import os
 // Sample-based drum engine.
 //
 // Acoustic kits use real multi-mic recordings bundled in Resources/Drums
-// (Karoryfer "Big Rusty Drums", CC0): 3 velocity layers x 2 round-robin takes per
-// drum, tuned / saturated per kit at load time. Clap, shaker and the Electronic kit
-// (and everything, if the recordings are missing) are rendered offline with the
-// synthesis below. At playback time the audio thread only mixes samples through a
-// 32-voice pool, so cymbals ring out naturally.
+// (Karoryfer "Big Rusty Drums", CC0): up to 7 velocity layers x 4 round-robin takes
+// per articulation, listed with their measured loudness in manifest.json. Clap, shaker
+// and the Electronic kit (and everything, if the recordings are missing) are rendered
+// offline with the synthesis below. At playback time the audio thread mixes the takes
+// through a 64-voice pool (see DrumSynth).
 
 // MARK: - Offline DSP helpers
 
@@ -343,44 +343,81 @@ enum DrumVoices {
     }
 }
 
+// MARK: - Instruments
+
+/// Instruments 0…10 are the pattern lanes (see RhythmLibrary); 11…14 are extra
+/// articulations the groove engine uses for fills, count-ins and accents.
+enum Drum {
+    static let kick = 0, snare = 1, hatClosed = 2, hatOpen = 3, ride = 4, crash = 5
+    static let tomHi = 6, tomLo = 7, stick = 8, clap = 9, shaker = 10
+    static let tomMid = 11, hatPedal = 12, rideBell = 13, hatLoose = 14
+    static let count = 15
+}
+
 // MARK: - Recorded samples
 
 enum RecordedDrums {
-    /// Bundled recording groups per drum (nil = synthesized).
+    struct Group {
+        let layers: Int
+        let roundRobins: Int
+        let loudness: [Float]     // attack loudness of each layer in dB (loudest = 0)
+    }
+
+    /// Recording group of a drum in a kit (nil = synthesized).
     static func group(for drum: Int, kit: KitParams) -> String? {
         switch drum {
-        case 0: return "kick"
-        case 1: return kit.snareSet
-        case 2: return kit.hatSet
-        case 3: return "hat_open"
-        case 4: return "ride"
-        case 5: return "crash"
-        case 6: return "tom_hi"
-        case 7: return "tom_lo"
-        case 8: return "sidestick"
+        case Drum.kick: return "kick"
+        case Drum.snare: return kit.snareSet
+        case Drum.hatClosed: return kit.hatSet
+        case Drum.hatOpen: return "hat_open"
+        case Drum.ride: return "ride"
+        case Drum.crash: return "crash"
+        case Drum.tomHi: return "tom_hi"
+        case Drum.tomLo: return "tom_lo"
+        case Drum.stick: return "sidestick"
+        case Drum.tomMid: return "tom_mid"
+        case Drum.hatPedal: return "hat_pedal"
+        case Drum.rideBell: return "ride_bell"
+        case Drum.hatLoose: return "hat_loose"
         default: return nil
         }
     }
 
     /// Mix balance of the recordings.
     static let gain: [String: Float] = [
-        "kick": 1.0, "snare": 0.85, "snare_rim": 0.85, "snare_brush": 0.95, "sidestick": 0.6,
-        "hat_closed": 0.42, "hat_brush": 0.5, "hat_open": 0.4, "ride": 0.38, "crash": 0.45,
-        "tom_hi": 0.75, "tom_lo": 0.8,
+        "kick": 1.0, "snare": 0.86, "snare_rim": 0.84, "snare_brush": 0.95, "sidestick": 0.62,
+        "hat_closed": 0.46, "hat_brush": 0.52, "hat_loose": 0.40, "hat_open": 0.40, "hat_pedal": 0.42,
+        "ride": 0.42, "ride_bell": 0.36, "crash": 0.46,
+        "tom_hi": 0.74, "tom_mid": 0.76, "tom_lo": 0.80,
     ]
 
     static var directory: URL? {
         let fm = FileManager.default
         var candidates: [URL] = []
         if let res = Bundle.main.resourceURL { candidates.append(res.appendingPathComponent("Drums")) }
-        let cwd = URL(fileURLWithPath: fm.currentDirectoryPath)
-        candidates.append(cwd.appendingPathComponent("Resources/Drums"))
-        return candidates.first { fm.fileExists(atPath: $0.appendingPathComponent("kick_v1_rr1.wav").path) }
+        candidates.append(URL(fileURLWithPath: fm.currentDirectoryPath).appendingPathComponent("Resources/Drums"))
+        return candidates.first { fm.fileExists(atPath: $0.appendingPathComponent("manifest.json").path) }
     }
 
-    /// Loads one take, resampled to `sr` (times `pitch`), with optional saturation.
-    static func load(_ dir: URL, group: String, layer: Int, rr: Int, sr: Double, pitch: Double, drive: Double) -> ([Float], [Float])? {
-        let url = dir.appendingPathComponent("\(group)_v\(layer + 1)_rr\(rr + 1).wav")
+    static func manifest(_ dir: URL) -> [String: Group] {
+        guard let data = try? Data(contentsOf: dir.appendingPathComponent("manifest.json")),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let groups = obj["groups"] as? [String: Any] else { return [:] }
+        var out: [String: Group] = [:]
+        for (name, any) in groups {
+            guard let g = any as? [String: Any],
+                  let layers = (g["layers"] as? NSNumber)?.intValue,
+                  let rrs = (g["roundRobins"] as? NSNumber)?.intValue,
+                  let loud = g["loudness"] as? [NSNumber], loud.count == layers, layers > 0, rrs > 0 else { continue }
+            out[name] = Group(layers: min(layers, SampleBank.maxLayers), roundRobins: rrs,
+                              loudness: loud.prefix(SampleBank.maxLayers).map { $0.floatValue })
+        }
+        return out
+    }
+
+    /// One take as interleaved 16-bit stereo plus its sample rate.
+    static func load(_ dir: URL, group: String, layer: Int, rr: Int) -> ([Int16], Double)? {
+        let url = dir.appendingPathComponent("\(group)_v\(layer + 1)_rr\(rr + 1).caf")
         guard let file = try? AVAudioFile(forReading: url) else { return nil }
         let fmt = file.processingFormat
         let n = Int(file.length)
@@ -389,203 +426,278 @@ enum RecordedDrums {
         let frames = Int(buf.frameLength)
         let c0 = ch[0]
         let c1 = fmt.channelCount > 1 ? ch[1] : ch[0]
-        let step = fmt.sampleRate / sr * pitch          // source frames per output frame
-        let outLen = max(1, Int(Double(frames - 1) / step))
-        let g = gain[group] ?? 0.8
-        let norm = drive > 1.001 ? Float(1 / tanh(drive)) : 1
-        var l = [Float](repeating: 0, count: outLen)
-        var r = [Float](repeating: 0, count: outLen)
-        for i in 0..<outLen {
-            let x = Double(i) * step
-            let j = Int(x)
-            let j1 = min(j + 1, frames - 1)
-            let f = Float(x - Double(j))
-            var a = c0[j] + (c0[j1] - c0[j]) * f
-            var b = c1[j] + (c1[j1] - c1[j]) * f
-            if drive > 1.001 {
-                a = tanhf(a * Float(drive)) * norm
-                b = tanhf(b * Float(drive)) * norm
-            }
-            l[i] = a * g
-            r[i] = b * g
+        var out = [Int16](repeating: 0, count: frames * 2)
+        for i in 0..<frames {
+            out[2 * i] = Int16(max(-32767, min(32767, c0[i] * 32767)))
+            out[2 * i + 1] = Int16(max(-32767, min(32767, c1[i] * 32767)))
         }
-        return (l, r)
+        return (out, fmt.sampleRate)
     }
 }
 
 // MARK: - Sample bank
 
-/// All drum samples in one contiguous buffer: [kit][drum][velocity layer][round robin].
+/// Every drum sound of every kit. Takes are stored once as interleaved 16-bit stereo;
+/// a "sound" (kit × drum) points at its velocity layers × round-robin takes and carries
+/// the measured loudness of each layer, its tuning, drive and mix gain.
 final class SampleBank {
-    static let layers = 3
-    static let variants = 2
-    let data: UnsafeMutablePointer<Float>
-    let offL: UnsafeMutablePointer<Int>
-    let offR: UnsafeMutablePointer<Int>
-    let len: UnsafeMutablePointer<Int>
-    let slots: Int
+    static let maxLayers = 8
+    let pcm: UnsafeMutablePointer<Int16>
+    let takeOff: UnsafeMutablePointer<Int>        // first frame of the take in `pcm`
+    let takeLen: UnsafeMutablePointer<Int>        // frames
+    let takeRate: UnsafeMutablePointer<Double>    // source rate / output rate
+    let sTake0: UnsafeMutablePointer<Int>
+    let sLayers: UnsafeMutablePointer<Int>
+    let sRR: UnsafeMutablePointer<Int>
+    let sLoud: UnsafeMutablePointer<Float>
+    let sPitch: UnsafeMutablePointer<Float>
+    let sGain: UnsafeMutablePointer<Float>
+    let sDrive: UnsafeMutablePointer<Float>
+    let sSampled: UnsafeMutablePointer<Int>
     let usesRecordings: Bool
+    let soundCount: Int
 
-    init(sampleRate: Double, kits: [KitParams]) {
+    static func sound(kit: Int, drum: Int) -> Int { kit * Drum.count + drum }
+
+    init(sampleRate sr: Double, kits: [KitParams]) {
         let dir = RecordedDrums.directory
-        var unique: [([Float], [Float])] = []      // each distinct take is stored once
-        var cache: [String: Int] = [:]
-        var slotTake: [Int] = []                   // slot -> index in `unique`
+        let groups = dir.map { RecordedDrums.manifest($0) } ?? [:]
+        var takes: [([Int16], Double)] = []
+        var groupStart: [String: Int] = [:]          // group -> first take index (or -1 if unusable)
+        var synthStart: [String: Int] = [:]
         var recorded = false
+
+        struct Sound { var take0 = 0, layers = 1, rrs = 2; var loud: [Float] = [0]
+                       var pitch: Float = 1, gain: Float = 1, drive: Float = 1, sampled = false }
+        var sounds: [Sound] = []
+
+        func synthTakes(_ k: Int, _ kit: KitParams, _ d: Int) -> Int {
+            let key = "\(k)|\(d)"
+            if let s = synthStart[key] { return s }
+            let start = takes.count
+            for v in 0..<2 {
+                let (l, r) = DrumVoices.render(d, kit: kit, sr: sr, variant: v)
+                let n = min(l.count, r.count)
+                var pcm = [Int16](repeating: 0, count: n * 2)
+                for i in 0..<n {
+                    pcm[2 * i] = Int16(max(-32767, min(32767, l[i] * 32767)))
+                    pcm[2 * i + 1] = Int16(max(-32767, min(32767, r[i] * 32767)))
+                }
+                takes.append((pcm, sr))
+            }
+            synthStart[key] = start
+            return start
+        }
+
         for (k, kit) in kits.enumerated() {
-            for d in 0..<kInstrumentCount {
-                for layer in 0..<SampleBank.layers {
-                    for v in 0..<SampleBank.variants {
-                        if kit.sampled, let dir, let group = RecordedDrums.group(for: d, kit: kit) {
-                            let tuned = d == 0 || d == 1 || d == 6 || d == 7
-                            let driven = d == 0 || d == 1
-                            let pitch = tuned ? kit.pitch : 1
-                            let drive = driven ? kit.drive : 1
-                            let key = "\(group)|\(layer)|\(v)|\(pitch)|\(drive)"
-                            if let idx = cache[key] {
-                                slotTake.append(idx)
-                                recorded = true
-                                continue
-                            }
-                            if let s = RecordedDrums.load(dir, group: group, layer: layer, rr: v, sr: sampleRate,
-                                                          pitch: pitch, drive: drive) {
-                                unique.append(s)
-                                cache[key] = unique.count - 1
-                                slotTake.append(unique.count - 1)
-                                recorded = true
-                                continue
+            for d in 0..<Drum.count {
+                var s = Sound()
+                if kit.sampled, let dir, let name = RecordedDrums.group(for: d, kit: kit), let g = groups[name] {
+                    var start = groupStart[name]
+                    if start == nil {
+                        let first = takes.count
+                        var ok = true
+                        loop: for layer in 0..<g.layers {
+                            for rr in 0..<g.roundRobins {
+                                guard let t = RecordedDrums.load(dir, group: name, layer: layer, rr: rr) else { ok = false; break loop }
+                                takes.append(t)
                             }
                         }
-                        // synthesized: velocity layers share the two takes, loudness comes from the gain
-                        let key = "synth|\(k)|\(d)|\(v)"
-                        if let idx = cache[key] {
-                            slotTake.append(idx)
-                        } else {
-                            unique.append(DrumVoices.render(d, kit: kit, sr: sampleRate, variant: v))
-                            cache[key] = unique.count - 1
-                            slotTake.append(unique.count - 1)
-                        }
+                        if !ok { takes.removeSubrange(first...) }
+                        start = ok ? first : -1
+                        groupStart[name] = start
+                    }
+                    if let st = start, st >= 0 {
+                        recorded = true
+                        let tuned = d == Drum.kick || d == Drum.snare || d == Drum.tomHi || d == Drum.tomMid || d == Drum.tomLo
+                        let driven = d == Drum.kick || d == Drum.snare
+                        s = Sound(take0: st, layers: g.layers, rrs: g.roundRobins, loud: g.loudness,
+                                  pitch: tuned ? Float(kit.pitch) : 1, gain: RecordedDrums.gain[name] ?? 0.8,
+                                  drive: driven ? Float(kit.drive) : 1, sampled: true)
+                        sounds.append(s)
+                        continue
                     }
                 }
+                // synthesized (extra articulations reuse a related sound)
+                var base = d, pitch: Float = 1, gain: Float = 1
+                switch d {
+                case Drum.tomMid: base = Drum.tomHi; pitch = 0.8
+                case Drum.hatPedal: base = Drum.hatClosed; gain = 0.5
+                case Drum.rideBell: base = Drum.ride; pitch = 1.12; gain = 0.9
+                case Drum.hatLoose: base = Drum.hatOpen; gain = 0.8
+                default: break
+                }
+                s.take0 = synthTakes(k, kit, base)
+                s.pitch = pitch
+                s.gain = gain
+                sounds.append(s)
             }
         }
-        let count = slotTake.count
-        let total = unique.reduce(0) { $0 + $1.0.count + $1.1.count }
-        let buf = UnsafeMutablePointer<Float>.allocate(capacity: max(1, total))
-        var takeL: [Int] = []
-        var takeR: [Int] = []
-        var takeLen: [Int] = []
-        var pos = 0
-        for s in unique {
-            takeL.append(pos)
-            (buf + pos).initialize(from: s.0, count: s.0.count)
-            pos += s.0.count
-            takeR.append(pos)
-            (buf + pos).initialize(from: s.1, count: s.1.count)
-            pos += s.1.count
-            takeLen.append(min(s.0.count, s.1.count))
-        }
-        let ol = UnsafeMutablePointer<Int>.allocate(capacity: count)
-        let orr = UnsafeMutablePointer<Int>.allocate(capacity: count)
-        let ln = UnsafeMutablePointer<Int>.allocate(capacity: count)
-        for (i, t) in slotTake.enumerated() {
-            ol[i] = takeL[t]
-            orr[i] = takeR[t]
-            ln[i] = takeLen[t]
-        }
-        data = buf
-        offL = ol
-        offR = orr
-        len = ln
-        slots = count
-        usesRecordings = recorded
-    }
 
-    static func slot(kit: Int, drum: Int, layer: Int, variant: Int) -> Int {
-        ((kit * kInstrumentCount + drum) * layers + layer) * variants + variant
+        let frames = takes.reduce(0) { $0 + $1.0.count / 2 }
+        let buf = UnsafeMutablePointer<Int16>.allocate(capacity: max(2, frames * 2))
+        let to = UnsafeMutablePointer<Int>.allocate(capacity: max(1, takes.count))
+        let tl = UnsafeMutablePointer<Int>.allocate(capacity: max(1, takes.count))
+        let tr = UnsafeMutablePointer<Double>.allocate(capacity: max(1, takes.count))
+        var pos = 0
+        for (i, t) in takes.enumerated() {
+            (buf + pos * 2).initialize(from: t.0, count: t.0.count)
+            to[i] = pos
+            tl[i] = t.0.count / 2
+            tr[i] = t.1 / sr
+            pos += t.0.count / 2
+        }
+        let n = sounds.count
+        func ints(_ f: (Sound) -> Int) -> UnsafeMutablePointer<Int> {
+            let p = UnsafeMutablePointer<Int>.allocate(capacity: max(1, n))
+            for (i, s) in sounds.enumerated() { p[i] = f(s) }
+            return p
+        }
+        func floats(_ f: (Sound) -> Float) -> UnsafeMutablePointer<Float> {
+            let p = UnsafeMutablePointer<Float>.allocate(capacity: max(1, n))
+            for (i, s) in sounds.enumerated() { p[i] = f(s) }
+            return p
+        }
+        let loud = UnsafeMutablePointer<Float>.allocate(capacity: max(1, n * SampleBank.maxLayers))
+        loud.initialize(repeating: 0, count: max(1, n * SampleBank.maxLayers))
+        for (i, s) in sounds.enumerated() {
+            for (j, x) in s.loud.prefix(SampleBank.maxLayers).enumerated() { loud[i * SampleBank.maxLayers + j] = x }
+        }
+        pcm = buf
+        takeOff = to
+        takeLen = tl
+        takeRate = tr
+        sTake0 = ints { $0.take0 }
+        sLayers = ints { $0.layers }
+        sRR = ints { $0.rrs }
+        sSampled = ints { $0.sampled ? 1 : 0 }
+        sPitch = floats { $0.pitch }
+        sGain = floats { $0.gain }
+        sDrive = floats { $0.drive }
+        sLoud = loud
+        soundCount = n
+        usesRecordings = recorded
     }
 }
 
 // MARK: - Realtime sample player
 
+@inline(__always) private func hermite(_ xm1: Float, _ x0: Float, _ x1: Float, _ x2: Float, _ t: Float) -> Float {
+    let c = (x1 - xm1) * 0.5
+    let v = x0 - x1
+    let w = c + v
+    let a = w + v + (x2 - x0) * 0.5
+    let b = w + a
+    return (((a * t) - b) * t + c) * t + x0
+}
+
 /// Plays the sample bank on the audio thread (no allocation, no blocking).
+///
+/// - velocity picks the recorded layer whose measured loudness is closest to the target
+///   level and trims the rest with gain, so timbre follows dynamics like a real drum;
+/// - round robins are chosen at random (never the same take twice in a row);
+/// - a new hit damps the previous ring of the same drum, the hi-hat pedal chokes open hats
+///   and cymbals keep ringing under new hits up to a few voices;
+/// - kick / snare / toms are tuned per kit by playing them back faster or slower
+///   (4-point Hermite interpolation, which also converts 44.1 kHz recordings to the device rate);
+/// - everything goes through a room (early reflections + 8-line feedback delay network)
+///   and a gentle bus compressor.
 final class DrumSynth {
     private let lock: UnsafeMutablePointer<os_unfair_lock>
-    private var pendingBank: SampleBank?     // set by the render thread under `lock`
-    private var bank: SampleBank?            // audio-thread copy, keeps the memory alive
-    private var data: UnsafeMutablePointer<Float>
-    private var offL: UnsafeMutablePointer<Int>
-    private var offR: UnsafeMutablePointer<Int>
-    private var lens: UnsafeMutablePointer<Int>
+    private var pendingBank: SampleBank?
+    private var bank: SampleBank?
+    private var pcm: UnsafeMutablePointer<Int16>
+    private var takeOff: UnsafeMutablePointer<Int>
+    private var takeLen: UnsafeMutablePointer<Int>
+    private var takeRate: UnsafeMutablePointer<Double>
     private(set) var ready = false
 
-    private let maxVoices = 32
+    private let maxVoices = 64
     private let vOn: UnsafeMutablePointer<Int>
-    private let vSlot: UnsafeMutablePointer<Int>
-    private let vPos: UnsafeMutablePointer<Int>
+    private let vTake: UnsafeMutablePointer<Int>
     private let vInst: UnsafeMutablePointer<Int>
+    private let vDelay: UnsafeMutablePointer<Int>
+    private let vAge: UnsafeMutablePointer<Int>
+    private let vPos: UnsafeMutablePointer<Double>
+    private let vRate: UnsafeMutablePointer<Double>
     private let vGain: UnsafeMutablePointer<Float>
+    private let vDrive: UnsafeMutablePointer<Float>
     private let vRel: UnsafeMutablePointer<Float>
     private let vRelStep: UnsafeMutablePointer<Float>
-    private let panL: UnsafeMutablePointer<Float>
-    private let panR: UnsafeMutablePointer<Float>
-    private let roundRobin: UnsafeMutablePointer<Int>
+    private let balL: UnsafeMutablePointer<Float>
+    private let balR: UnsafeMutablePointer<Float>
+    private let sendAmt: UnsafeMutablePointer<Float>
+    private let lastTake: UnsafeMutablePointer<Int>
     private let roomSend: UnsafeMutablePointer<Float>
-    private let sampledKit: UnsafeMutablePointer<Int>
+    private let roomTime: UnsafeMutablePointer<Double>
     private let kitCount: Int
     private var kitIndex = 0
+    private var reverbKit = -1
+    private var ageCounter = 0
     private var rng: UInt32 = 0x1234_5678
-    private let chokeStep: Float
-    let reverb: Reverb
+    private let sr: Double
+    private let reverb: RoomReverb
+    private var comp: BusCompressor
     var reverbLevel: Float = 0.2
 
     init(sampleRate: Double) {
+        sr = sampleRate
         let lk = UnsafeMutablePointer<os_unfair_lock>.allocate(capacity: 1)
         lk.initialize(to: os_unfair_lock())
         lock = lk
-        // placeholders until the bank is rendered
-        let dummyF = UnsafeMutablePointer<Float>.allocate(capacity: 1)
-        dummyF.initialize(to: 0)
+        let dummy16 = UnsafeMutablePointer<Int16>.allocate(capacity: 2)
+        dummy16.initialize(repeating: 0, count: 2)
         let dummyI = UnsafeMutablePointer<Int>.allocate(capacity: 1)
         dummyI.initialize(to: 0)
-        data = dummyF
-        offL = dummyI
-        offR = dummyI
-        lens = dummyI
-        func f(_ n: Int) -> UnsafeMutablePointer<Float> {
+        let dummyD = UnsafeMutablePointer<Double>.allocate(capacity: 1)
+        dummyD.initialize(to: 1)
+        pcm = dummy16
+        takeOff = dummyI
+        takeLen = dummyI
+        takeRate = dummyD
+        func f(_ n: Int, _ x: Float = 0) -> UnsafeMutablePointer<Float> {
             let p = UnsafeMutablePointer<Float>.allocate(capacity: n)
-            p.initialize(repeating: 0, count: n)
+            p.initialize(repeating: x, count: n)
             return p
         }
-        func i(_ n: Int) -> UnsafeMutablePointer<Int> {
+        func i(_ n: Int, _ x: Int = 0) -> UnsafeMutablePointer<Int> {
             let p = UnsafeMutablePointer<Int>.allocate(capacity: n)
+            p.initialize(repeating: x, count: n)
+            return p
+        }
+        func d(_ n: Int) -> UnsafeMutablePointer<Double> {
+            let p = UnsafeMutablePointer<Double>.allocate(capacity: n)
             p.initialize(repeating: 0, count: n)
             return p
         }
-        vOn = i(32); vSlot = i(32); vPos = i(32); vInst = i(32)
-        vGain = f(32); vRel = f(32); vRelStep = f(32)
-        panL = f(kInstrumentCount); panR = f(kInstrumentCount)
-        roundRobin = i(kInstrumentCount)
+        let mv = 64
+        vOn = i(mv); vTake = i(mv); vInst = i(mv); vDelay = i(mv); vAge = i(mv)
+        vPos = d(mv); vRate = d(mv)
+        vGain = f(mv); vDrive = f(mv, 1); vRel = f(mv, 1); vRelStep = f(mv)
+        balL = f(Drum.count, 1); balR = f(Drum.count, 1); sendAmt = f(Drum.count, 1)
         let kits = RhythmLibrary.kits
         kitCount = kits.count
+        lastTake = i(kits.count * Drum.count, -1)
         roomSend = f(kits.count)
-        sampledKit = i(kits.count)
-        chokeStep = Float(1.0 / (0.012 * sampleRate))
-        reverb = Reverb(sampleRate: sampleRate)
-        // all stored properties initialised
-        let pans: [Float] = [0, 0, 0.28, 0.28, -0.32, 0.35, -0.22, 0.25, 0.05, 0, 0.4]
-        for d in 0..<kInstrumentCount {
-            panL[d] = 1 - max(0, pans[d])
-            panR[d] = 1 + min(0, pans[d])
+        roomTime = d(kits.count)
+        reverb = RoomReverb(sampleRate: sampleRate)
+        comp = BusCompressor(sampleRate: sampleRate)
+        // stereo placement (drummer's perspective) and room send per drum
+        //                     K     S    HC     HO    R     C     T1    T3    Stk  Clap  Shk   T2   Ped  Bell  HL
+        let pans: [Float] = [0, 0, -0.35, -0.35, 0.35, -0.25, -0.2, 0.35, 0, 0, 0.3, 0.08, -0.35, 0.35, -0.35]
+        let sends: [Float] = [0.3, 1.0, 0.45, 0.55, 0.5, 0.6, 0.9, 0.9, 0.8, 0.9, 0.5, 0.9, 0.4, 0.5, 0.5]
+        for dr in 0..<Drum.count {
+            balL[dr] = 1 - max(0, pans[dr])
+            balR[dr] = 1 + min(0, pans[dr])
+            sendAmt[dr] = sends[dr]
         }
         for (k, kit) in kits.enumerated() {
             roomSend[k] = Float(kit.room)
-            sampledKit[k] = kit.sampled ? 1 : 0
+            roomTime[k] = 0.42 + 0.22 * kit.room
         }
-
-        let sr = sampleRate
+        let rate = sampleRate
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let built = SampleBank(sampleRate: sr, kits: kits)
+            let built = SampleBank(sampleRate: rate, kits: kits)
             guard let self else { return }
             os_unfair_lock_lock(self.lock)
             self.pendingBank = built
@@ -598,19 +710,22 @@ final class DrumSynth {
         guard !ready, os_unfair_lock_trylock(lock) else { return }
         if let b = pendingBank {
             bank = b
-            data = b.data
-            offL = b.offL
-            offR = b.offR
-            lens = b.len
-            if !b.usesRecordings {
-                for k in 0..<kitCount { sampledKit[k] = 0 }
-            }
+            pcm = b.pcm
+            takeOff = b.takeOff
+            takeLen = b.takeLen
+            takeRate = b.takeRate
             ready = true
         }
         os_unfair_lock_unlock(lock)
     }
 
-    func setKit(_ i: Int) { kitIndex = max(0, min(kitCount - 1, i)) }
+    func setKit(_ i: Int) {
+        kitIndex = max(0, min(kitCount - 1, i))
+        if kitIndex != reverbKit {
+            reverbKit = kitIndex
+            reverb.setDecay(roomTime[kitIndex])
+        }
+    }
 
     @inline(__always) private func random() -> Float {
         rng ^= rng << 13
@@ -619,38 +734,91 @@ final class DrumSynth {
         return Float(rng) / Float(UInt32.max)
     }
 
-    func trigger(_ d: Int, _ velocity: Float) {
-        guard ready, d >= 0, d < kInstrumentCount else { return }
-        // closed hat chokes the open hat
-        if d == 2 {
-            for v in 0..<maxVoices where vOn[v] != 0 && vInst[v] == 3 && vRelStep[v] == 0 {
-                vRelStep[v] = chokeStep
-            }
+    private func release(where match: (Int) -> Bool, seconds: Double) {
+        let step = Float(1.0 / max(1, seconds * sr))
+        for v in 0..<maxVoices where vOn[v] != 0 && match(vInst[v]) {
+            if vRelStep[v] == 0 || vRelStep[v] < step { vRelStep[v] = step }
         }
+    }
+
+    /// Plays drum `d` at `velocity` (0…1), `delay` samples from now.
+    func trigger(_ d: Int, _ velocity: Float, delay: Int = 0) {
+        guard ready, let bank, d >= 0, d < Drum.count else { return }
+        // natural damping / choking
+        switch d {
+        case Drum.hatClosed, Drum.hatPedal:
+            release(where: { $0 == Drum.hatOpen || $0 == Drum.hatLoose }, seconds: 0.035)
+            release(where: { $0 == d }, seconds: 0.08)
+        case Drum.hatLoose:
+            release(where: { $0 == Drum.hatOpen || $0 == Drum.hatLoose }, seconds: 0.06)
+        case Drum.hatOpen:
+            release(where: { $0 == Drum.hatOpen || $0 == Drum.hatLoose }, seconds: 0.12)
+        case Drum.kick: release(where: { $0 == Drum.kick }, seconds: 0.15)
+        case Drum.snare: release(where: { $0 == Drum.snare }, seconds: 0.12)
+        case Drum.tomHi, Drum.tomMid, Drum.tomLo: release(where: { $0 == d }, seconds: 0.2)
+        case Drum.stick, Drum.clap, Drum.shaker: release(where: { $0 == d }, seconds: 0.06)
+        case Drum.ride, Drum.crash, Drum.rideBell:
+            // cymbals wash on, but keep only the newest few rings
+            var n = 0
+            var oldest = -1
+            var oldestAge = Int.max
+            for v in 0..<maxVoices where vOn[v] != 0 && vInst[v] == d && vRelStep[v] == 0 {
+                n += 1
+                if vAge[v] < oldestAge { oldestAge = vAge[v]; oldest = v }
+            }
+            if n >= 3 && oldest >= 0 { vRelStep[oldest] = Float(1.0 / (0.4 * sr)) }
+        default: break
+        }
+
+        let s = SampleBank.sound(kit: kitIndex, drum: d)
+        guard s < bank.soundCount else { return }
+        let layers = bank.sLayers[s]
+        let rrs = bank.sRR[s]
+        let vel = max(0.02, min(1, velocity))
+        // target level: full velocity = 0 dB, ghost notes (0.3) ≈ -20 dB
+        let target = -30 * powf(1 - vel, 1.1)
+        var layer = 0
+        var gainDB: Float
+        if bank.sSampled[s] != 0 && layers > 1 {
+            let aim = target + (random() - 0.5) * 3
+            var best = Float.greatestFiniteMagnitude
+            for j in 0..<layers {
+                let dist = abs(bank.sLoud[s * SampleBank.maxLayers + j] - aim)
+                if dist < best { best = dist; layer = j }
+            }
+            gainDB = max(-18, min(4, target - bank.sLoud[s * SampleBank.maxLayers + layer]))
+        } else {
+            gainDB = target * 0.8
+        }
+        var rr = Int(random() * Float(rrs)) % max(1, rrs)
+        var take = bank.sTake0[s] + layer * rrs + rr
+        if take == lastTake[s] && rrs > 1 {
+            rr = (rr + 1) % rrs
+            take = bank.sTake0[s] + layer * rrs + rr
+        }
+        lastTake[s] = take
+
         // free voice, otherwise steal the oldest
         var slot = -1
-        var oldest = -1
-        var oldestPos = -1
+        var oldest = 0
+        var oldestAge = Int.max
         for v in 0..<maxVoices {
             if vOn[v] == 0 { slot = v; break }
-            if vPos[v] > oldestPos { oldestPos = vPos[v]; oldest = v }
+            if vAge[v] < oldestAge { oldestAge = vAge[v]; oldest = v }
         }
-        if slot < 0 { slot = max(0, oldest) }
-        let variant = roundRobin[d]
-        roundRobin[d] = (variant + 1) % SampleBank.variants
+        if slot < 0 { slot = oldest }
+        ageCounter += 1
         vOn[slot] = 1
-        let vel = max(0.05, min(1, velocity))
-        let layer = vel < 0.45 ? 0 : (vel < 0.8 ? 1 : 2)
-        vSlot[slot] = SampleBank.slot(kit: kitIndex, drum: d, layer: layer, variant: variant)
-        vPos[slot] = 0
+        vTake[slot] = take
         vInst[slot] = d
+        vDelay[slot] = max(0, delay)
+        vAge[slot] = ageCounter
+        vPos[slot] = 0
+        vRate[slot] = takeRate[take] * Double(bank.sPitch[s]) * Double(1 + (random() - 0.5) * 0.004)
+        vGain[slot] = powf(10, gainDB / 20) * bank.sGain[s]
+        vDrive[slot] = bank.sDrive[s]
         vRel[slot] = 1
         vRelStep[slot] = 0
-        // recorded layers already carry the dynamics; synthesized drums get a velocity curve
-        let recordedHit = sampledKit[kitIndex] != 0 && d <= 8
-        let nominal: Float = layer == 0 ? 0.4 : (layer == 1 ? 0.7 : 1.0)
-        let g = recordedHit ? sqrtf(vel / nominal) : powf(vel, 1.4)
-        vGain[slot] = g * (0.95 + 0.1 * random())
     }
 
     func next() -> (Float, Float) {
@@ -658,10 +826,17 @@ final class DrumSynth {
         var r: Float = 0
         var send: Float = 0
         if ready {
+            let scale: Float = 1.0 / 32768
             for v in 0..<maxVoices where vOn[v] != 0 {
-                let s = vSlot[v]
-                let p = vPos[v]
-                if p >= lens[s] {
+                if vDelay[v] > 0 {
+                    vDelay[v] -= 1
+                    continue
+                }
+                let t = vTake[v]
+                let len = takeLen[t]
+                let pos = vPos[v]
+                let i = Int(pos)
+                if i >= len - 1 {
                     vOn[v] = 0
                     continue
                 }
@@ -673,20 +848,41 @@ final class DrumSynth {
                         continue
                     }
                     vRel[v] = rel
-                    g *= rel
+                    g *= rel * rel
+                }
+                let base = pcm + takeOff[t] * 2
+                let frac = Float(pos - Double(i))
+                var xl: Float
+                var xr: Float
+                if frac == 0 {
+                    xl = Float(base[2 * i])
+                    xr = Float(base[2 * i + 1])
+                } else {
+                    let im1 = i > 0 ? i - 1 : 0
+                    let i2 = i + 2 < len ? i + 2 : len - 1
+                    xl = hermite(Float(base[2 * im1]), Float(base[2 * i]), Float(base[2 * i + 2]), Float(base[2 * i2]), frac)
+                    xr = hermite(Float(base[2 * im1 + 1]), Float(base[2 * i + 1]), Float(base[2 * i + 3]), Float(base[2 * i2 + 1]), frac)
+                }
+                xl *= scale * g
+                xr *= scale * g
+                let dr = vDrive[v]
+                if dr > 1.001 {
+                    let norm = 1 / tanhf(dr)
+                    xl = tanhf(xl * dr) * norm
+                    xr = tanhf(xr * dr) * norm
                 }
                 let d = vInst[v]
-                let xl = data[offL[s] + p] * g
-                let xr = data[offR[s] + p] * g
-                l += xl * panL[d]
-                r += xr * panR[d]
-                if d != 0 { send += (xl + xr) * 0.5 }
-                vPos[v] = p + 1
+                xl *= balL[d]
+                xr *= balR[d]
+                l += xl
+                r += xr
+                send += (xl + xr) * 0.5 * sendAmt[d]
+                vPos[v] = pos + vRate[v]
             }
         }
-        let wet = reverb.process(send * 0.1 * roomSend[kitIndex])
-        l += wet.0 * reverbLevel * 1.5
-        r += wet.1 * reverbLevel * 1.5
-        return (l * 0.85, r * 0.85)
+        let wet = reverb.process(send * roomSend[kitIndex])
+        l += wet.0 * reverbLevel * 0.9
+        r += wet.1 * reverbLevel * 0.9
+        return comp.process(l * 0.8, r * 0.8)
     }
 }

@@ -3,74 +3,10 @@ import Foundation
 // All classes in this file run on the realtime audio thread: no allocation,
 // no locks, no Swift arrays in the per-sample path.
 
-/// Small Schroeder/Freeverb style stereo reverb used for the rhythm part.
-final class Reverb {
-    private let buf: UnsafeMutablePointer<Float>
-    private let off: UnsafeMutablePointer<Int>
-    private let len: UnsafeMutablePointer<Int>
-    private let idx: UnsafeMutablePointer<Int>
-    private let damp: UnsafeMutablePointer<Float>
-    // 12 delay lines: 4 comb L, 4 comb R, 2 allpass L, 2 allpass R
-    var feedback: Float = 0.84
-    var damping: Float = 0.3
-
-    init(sampleRate: Double) {
-        let scale = sampleRate / 44100.0
-        let base = [1116, 1188, 1277, 1356, 1116 + 23, 1188 + 23, 1277 + 23, 1356 + 23, 556, 441, 556 + 23, 441 + 23]
-        let count = base.count
-        let o = UnsafeMutablePointer<Int>.allocate(capacity: count)
-        let l = UnsafeMutablePointer<Int>.allocate(capacity: count)
-        let ix = UnsafeMutablePointer<Int>.allocate(capacity: count)
-        let dp = UnsafeMutablePointer<Float>.allocate(capacity: count)
-        var total = 0
-        for i in 0..<count {
-            let n = max(8, Int(Double(base[i]) * scale))
-            o[i] = total
-            l[i] = n
-            ix[i] = 0
-            dp[i] = 0
-            total += n
-        }
-        let b = UnsafeMutablePointer<Float>.allocate(capacity: total)
-        b.initialize(repeating: 0, count: total)
-        off = o
-        len = l
-        idx = ix
-        damp = dp
-        buf = b
-    }
-
-    @inline(__always) private func comb(_ c: Int, _ x: Float) -> Float {
-        let i = idx[c]
-        let p = off[c] + i
-        let y = buf[p]
-        damp[c] = y * (1 - damping) + damp[c] * damping
-        buf[p] = x + damp[c] * feedback
-        idx[c] = (i + 1 == len[c]) ? 0 : i + 1
-        return y
-    }
-
-    @inline(__always) private func allpass(_ a: Int, _ x: Float) -> Float {
-        let i = idx[a]
-        let p = off[a] + i
-        let y = buf[p]
-        buf[p] = x + y * 0.5
-        idx[a] = (i + 1 == len[a]) ? 0 : i + 1
-        return y - x
-    }
-
-    @inline(__always) func process(_ x: Float) -> (Float, Float) {
-        var l: Float = 0
-        var r: Float = 0
-        l += comb(0, x); l += comb(1, x); l += comb(2, x); l += comb(3, x)
-        r += comb(4, x); r += comb(5, x); r += comb(6, x); r += comb(7, x)
-        l = allpass(8, l); l = allpass(9, l)
-        r = allpass(10, r); r = allpass(11, r)
-        return (l * 0.25, r * 0.25)
-    }
-}
-
-/// Step sequencer that plays the pattern table through the drum synth.
+/// Step sequencer that plays the pattern table through the drum synth, like a drummer
+/// would: metric accents on the time-keeping parts, small timing and velocity deviations
+/// per instrument, bar-to-bar dynamics, varied fills and a crash after each fill.
+/// `humanize` = 0 gives the rigid drum-machine grid.
 final class RhythmEngine {
     let sampleRate: Double
     let synth: DrumSynth
@@ -79,6 +15,8 @@ final class RhythmEngine {
     private let steps: UnsafeMutablePointer<Int>
     private let beats: UnsafeMutablePointer<Double>
     private let swing: UnsafeMutablePointer<Double>
+    /// 0 = played by a drummer, 1 = programmed (tight timing), 2 = metronome (no humanizing)
+    private let feelKind: UnsafeMutablePointer<Int>
 
     private(set) var frame = 0
     private var stepCount = 0
@@ -98,6 +36,14 @@ final class RhythmEngine {
     /// Set when the ending's final hit has been played (read by LoopCore).
     private(set) var endingDone = false
 
+    // groove
+    private var humanize: Float = 0.6
+    private var rng: UInt32 = 0x2545_F491
+    private var barLevel: Float = 1
+    private var barTarget: Float = 1
+    private var crashNext = false
+    private var fillKind = 0
+
     init(sampleRate: Double) {
         self.sampleRate = sampleRate
         synth = DrumSynth(sampleRate: sampleRate)
@@ -107,12 +53,14 @@ final class RhythmEngine {
         steps = .allocate(capacity: defs.count)
         beats = .allocate(capacity: defs.count)
         swing = .allocate(capacity: defs.count)
+        feelKind = .allocate(capacity: defs.count)
         for (i, p) in defs.enumerated() {
             steps[i] = max(1, p.steps)
             beats[i] = p.beats
             swing[i] = p.swing
+            feelKind[i] = p.category == "Metronome" ? 2 : (p.category == "Electronic" ? 1 : 0)
         }
-        configure(tempo: 120, pattern: 0, variation: 0, kit: 0, reverb: 0.2)
+        configure(tempo: 120, pattern: 0, variation: 0, kit: 0, reverb: 0.2, humanize: 0.6)
         reset()
     }
 
@@ -124,8 +72,9 @@ final class RhythmEngine {
         return table[((pattern * 2 + (variation == 0 ? 0 : 1)) * kInstrumentCount + drum) * kMaxSteps + step]
     }
 
-    func configure(tempo: Double, pattern: Int, variation: Int, kit: Int, reverb: Float) {
+    func configure(tempo: Double, pattern: Int, variation: Int, kit: Int, reverb: Float, humanize h: Float = 0.6) {
         synth.prepare()
+        humanize = max(0, min(1, h))
         requestedVar = variation == 0 ? 0 : 1
         synth.setKit(kit)
         synth.reverbLevel = reverb
@@ -145,6 +94,9 @@ final class RhythmEngine {
     func reset() {
         frame = 0
         stepCount = 0
+        crashNext = false
+        barLevel = 1
+        barTarget = 1
         activeVar = requestedVar
         nextTrigger = triggerFrame(0)
     }
@@ -179,13 +131,93 @@ final class RhythmEngine {
         return true
     }
 
+    // MARK: Groove
+
+    @inline(__always) private func rnd() -> Float {
+        rng ^= rng << 13
+        rng ^= rng >> 17
+        rng ^= rng << 5
+        return Float(rng) / Float(UInt32.max)
+    }
+
+    /// Roughly normal, mean 0, standard deviation 1.
+    @inline(__always) private func gauss() -> Float {
+        (rnd() + rnd() + rnd() - 1.5) * 2
+    }
+
+    /// Relative strength of a grid position inside the beat (down-beat, off-beat, in-between).
+    @inline(__always) private func accent(_ pos: Int, _ spb: Int) -> Float {
+        if pos == 0 { return 1 }
+        if spb % 3 == 0 && spb / 3 > 0 {
+            let third = spb / 3
+            if pos % third == 0 { return pos / third == 2 ? 0.86 : 0.76 }
+            return 0.7
+        }
+        if spb % 2 == 0 && pos * 2 == spb { return 0.84 }
+        return 0.72
+    }
+
+    /// Timing per instrument: (average lateness, spread) in milliseconds at full humanize.
+    @inline(__always) private func timing(_ d: Int) -> (Float, Float) {
+        switch d {
+        case Drum.kick: return (2.5, 1.5)
+        case Drum.snare: return (4.0, 2.0)
+        case Drum.hatClosed, Drum.hatOpen, Drum.hatPedal, Drum.hatLoose: return (3.0, 2.4)
+        case Drum.ride, Drum.rideBell: return (3.0, 2.2)
+        case Drum.crash: return (3.0, 2.0)
+        case Drum.tomHi, Drum.tomMid, Drum.tomLo: return (3.5, 2.6)
+        case Drum.shaker: return (3.0, 3.0)
+        default: return (3.0, 1.8)
+        }
+    }
+
+    /// Plays one hit with the drummer's feel applied.
+    private func hit(_ d: Int, _ v: Float, pos: Int, spb: Int, downbeat: Bool = false) {
+        let kind = feelKind[curPattern]
+        let h: Float = kind == 2 ? 0 : humanize
+        var vel = v
+        if v >= 0.95 {
+            let shape = min(1, h * 1.6)
+            switch d {
+            case Drum.hatClosed, Drum.hatOpen, Drum.ride, Drum.shaker, Drum.hatPedal:
+                vel *= 1 + (accent(pos, spb) - 1) * shape
+            case Drum.kick, Drum.snare:
+                vel *= downbeat ? 1 : 1 - 0.05 * shape
+            default: break
+            }
+        }
+        if vel < 0.4 {
+            vel += gauss() * 0.035 * h                 // ghost notes vary a lot in level
+        } else {
+            vel *= 1 + gauss() * 0.045 * h
+        }
+        vel *= barLevel
+        let (late, spread) = timing(d)
+        let ms = h * (kind == 1 ? 0.3 : 1) * (late + gauss() * spread)
+        let delay = Int(Double(max(0, min(14, ms))) * 0.001 * sampleRate)
+        synth.trigger(d, max(0.02, min(1, vel)), delay: delay)
+    }
+
+    /// Drum of a fill template at one of four slots across the last beat.
+    @inline(__always) private func fillDrum(_ kind: Int, _ slot: Int) -> Int {
+        switch kind {
+        case 0: return Drum.snare
+        case 1: return slot < 2 ? Drum.snare : (slot == 2 ? Drum.tomHi : Drum.tomMid)
+        case 2: return slot == 0 ? Drum.tomHi : (slot == 1 ? Drum.tomMid : Drum.tomLo)
+        default: return slot == 0 ? Drum.snare : (slot == 1 ? Drum.tomHi : (slot == 2 ? Drum.tomMid : Drum.tomLo))
+        }
+    }
+
     /// One step of a drum fill inside the last beat of the bar (k = step within the beat).
     private func playFill(_ k: Int, _ spb: Int) {
-        let pos = Double(k) / Double(spb)
-        let inst = pos < 0.5 ? 1 : (pos < 0.75 ? 6 : 7)
-        let vel = Float(0.72 + 0.28 * pos)
-        synth.trigger(inst, vel)
-        if k == 0 { synth.trigger(0, 0.9) }
+        if k == 0 {
+            fillKind = mode == .intro ? 0 : Int(rnd() * 4) % 4
+            hit(Drum.kick, 0.85, pos: 0, spb: spb)
+        }
+        let slot = min(3, k * 4 / max(1, spb))
+        let vel = 0.6 + 0.4 * Float(k + 1) / Float(max(1, spb))
+        hit(fillDrum(fillKind, slot), vel, pos: k, spb: spb)
+        if mode != .ending { crashNext = true }
     }
 
     private func fire(_ s: Int) {
@@ -193,21 +225,24 @@ final class RhythmEngine {
         let idx = s % n
         let spb = max(1, Int((Double(n) / max(0.5, beats[curPattern])).rounded()))
         let fillStart = n - spb
+        let pos = idx % spb
         if idx == 0 {
             if mode == .ending && endingArmed {
                 // final hit on the downbeat, then the rhythm stops
-                synth.trigger(5, 1.0)
-                synth.trigger(0, 1.0)
+                hit(Drum.crash, 1.0, pos: 0, spb: spb, downbeat: true)
+                hit(Drum.kick, 1.0, pos: 0, spb: spb, downbeat: true)
                 mode = .finished
                 endingDone = true
                 return
             }
             activeVar = requestedVar
+            barTarget = 1 + gauss() * 0.03 * humanize
         }
+        barLevel += (barTarget - barLevel) * 0.2
         if mode == .finished { return }
         if mode == .count {
             // metronome count: accented click on beat 1, softer clicks on the other beats
-            if idx % spb == 0 { synth.trigger(8, idx == 0 ? 1.0 : 0.62) }
+            if pos == 0 { synth.trigger(Drum.stick, idx == 0 ? 1.0 : 0.62) }
             return
         }
         if mode == .ending { endingArmed = true }
@@ -218,17 +253,29 @@ final class RhythmEngine {
             return
         }
         if mode == .intro {
-            // count: rim click + hi-hat on every beat
-            if idx % spb == 0 {
-                synth.trigger(8, idx == 0 ? 1.0 : 0.7)
-                synth.trigger(2, 0.6)
+            // count-in with sticks and the hi-hat pedal on every beat
+            if pos == 0 {
+                hit(Drum.stick, idx == 0 ? 1.0 : 0.75, pos: 0, spb: spb)
+                hit(Drum.hatPedal, 0.7, pos: 0, spb: spb)
             }
             return
+        }
+        var crashed = false
+        if idx == 0 && crashNext {
+            crashNext = false
+            crashed = true
+            hit(Drum.crash, 0.92, pos: 0, spb: spb, downbeat: true)
         }
         let base = (curPattern * 2 + activeVar) * kInstrumentCount * kMaxSteps
         for d in 0..<kInstrumentCount {
             let v = table[base + d * kMaxSteps + idx]
-            if v > 0 { synth.trigger(d, v) }
+            if v <= 0 { continue }
+            // the crash replaces the time-keeping cymbal on its down-beat
+            if crashed && (d == Drum.hatClosed || d == Drum.ride || d == Drum.crash) { continue }
+            hit(d, v, pos: pos, spb: spb, downbeat: idx == 0)
+        }
+        if crashed && table[base + Drum.kick * kMaxSteps] <= 0 {
+            hit(Drum.kick, 0.9, pos: 0, spb: spb, downbeat: true)
         }
     }
 

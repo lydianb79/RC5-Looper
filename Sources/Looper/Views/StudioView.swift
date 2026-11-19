@@ -970,8 +970,17 @@ private struct RhythmPanel: View {
                 ToggleChip(title: "Ending", isOn: $looper.settings.rhythmEnding)
                 ToggleChip(title: "Count-in", isOn: $looper.settings.countIn)
                 HStack(spacing: 6) {
+                    Text("Feel").font(.system(size: 11)).foregroundColor(UI.muted)
+                    Slider(value: $looper.settings.rhythmHumanize, in: 0...1).frame(width: 80)
+                        .help("Humanize: 0 = rigid drum machine, right = a drummer's natural timing and dynamics")
+                }
+                HStack(spacing: 6) {
+                    Text("Room").font(.system(size: 11)).foregroundColor(UI.muted)
+                    Slider(value: $looper.settings.rhythmReverb, in: 0...1).frame(width: 70)
+                }
+                HStack(spacing: 6) {
                     Text("Level").font(.system(size: 11)).foregroundColor(UI.muted)
-                    Slider(value: $looper.settings.rhythmLevel, in: 0...2).frame(width: 110)
+                    Slider(value: $looper.settings.rhythmLevel, in: 0...2).frame(width: 90)
                 }
             }
             StepGrid(pattern: s.rhythmPattern, variation: s.rhythmVariation, on: s.rhythmOn,

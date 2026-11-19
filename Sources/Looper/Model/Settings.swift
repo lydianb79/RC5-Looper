@@ -79,6 +79,7 @@ struct MemorySettings: Codable, Equatable {
     var rhythmKit = 0
     var rhythmLevel = 0.7
     var rhythmReverb = 0.2
+    var rhythmHumanize = 0.6     // 0 = quantized machine, 1 = loose human feel
     var rhythmIntro = false      // one-bar intro (count + fill) before recording
     var rhythmEnding = false     // fill + final hit when stopping
     var tempo = 120.0
@@ -91,7 +92,7 @@ struct MemorySettings: Codable, Equatable {
     enum CodingKeys: String, CodingKey {
         case name, recAction, dubMode, quantize, autoRec, countIn, startMode, stopMode, fadeSeconds
         case thumb, oneShot, reverse, loopLevel, rhythmOn, rhythmPattern, rhythmVariation, rhythmKit
-        case rhythmLevel, rhythmReverb, rhythmIntro, rhythmEnding, tempo, loopTempo, stretchMode, loopMeasures, savedSeconds
+        case rhythmLevel, rhythmReverb, rhythmHumanize, rhythmIntro, rhythmEnding, tempo, loopTempo, stretchMode, loopMeasures, savedSeconds
     }
 
     static func defaults(for slot: Int) -> MemorySettings {
@@ -127,6 +128,7 @@ extension MemorySettings {
         rhythmKit = v(.rhythmKit, rhythmKit)
         rhythmLevel = v(.rhythmLevel, rhythmLevel)
         rhythmReverb = v(.rhythmReverb, rhythmReverb)
+        rhythmHumanize = v(.rhythmHumanize, rhythmHumanize)
         rhythmIntro = v(.rhythmIntro, rhythmIntro)
         rhythmEnding = v(.rhythmEnding, rhythmEnding)
         tempo = v(.tempo, tempo)

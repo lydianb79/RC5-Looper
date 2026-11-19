@@ -270,6 +270,11 @@ struct RhythmView: View {
                     Text("Room")
                     Slider(value: $looper.settings.rhythmReverb, in: 0...1).frame(width: 90)
                 }
+                HStack(spacing: 8) {
+                    Text("Feel")
+                    Slider(value: $looper.settings.rhythmHumanize, in: 0...1).frame(width: 90)
+                        .help("Humanize: 0 = rigid drum machine, right = a drummer's natural timing and dynamics")
+                }
                 Spacer()
             }
             .padding(.horizontal, 16)

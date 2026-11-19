@@ -68,6 +68,7 @@ final class LoopCore {
     var variation = 0
     var kitIndex = 0
     var reverbLevel: Float = 0.2
+    var humanize: Float = 0.6
     var inputSampleRate: Double = 0
     var inputLeftChannel = 0
     var inputRightChannel = 1
@@ -833,7 +834,7 @@ final class LoopCore {
         } else if jobActive[0] != 0 || jobActive[1] != 0 {
             processJobs(budget: 1 << 17)
         }
-        rhythm.configure(tempo: tempo, pattern: patternIndex, variation: variation, kit: kitIndex, reverb: reverbLevel)
+        rhythm.configure(tempo: tempo, pattern: patternIndex, variation: variation, kit: kitIndex, reverb: reverbLevel, humanize: humanize)
         if !rhythmOn && rhythmPreview { rhythmPreview = false }
 
         let wEnd = ringWrite
