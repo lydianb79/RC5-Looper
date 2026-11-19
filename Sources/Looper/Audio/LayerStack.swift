@@ -435,6 +435,7 @@ final class LayerStack {
     /// Swaps in the preloaded base; all layers are discarded.
     func swapPreloaded() {
         clearAll()
+        baseZeroCursor = baseZeroEnd          // the new base is complete; never zero it
         let l = baseL
         let r = baseR
         baseL = preloadL

@@ -56,6 +56,19 @@ final class LooperController: ObservableObject {
     @Published var trackMuted: [Bool] = [false, false] { didSet { core.sub1.muted = trackMuted[0]; core.sub2.muted = trackMuted[1] } }
     @Published var mainMuted = false { didSet { core.mainMuted = mainMuted } }
     @Published var allMuted = false { didSet { core.allMuted = allMuted } }
+    /// Song mode: memories chained with repeat counts, switched seamlessly at the loop end.
+    @Published var song: Song = Song.load() { didSet { song.save() } }
+    @Published var songActive = false
+    @Published var songStep = 0
+    @Published var songRepeat = 0
+    @Published var showSong = false
+    var songPrepared = false
+    var songLastSwap = 0
+    /// Export sheet and MIDI learn.
+    @Published var showExport = false
+    @Published var exportProgress: Double?
+    @Published var midiLearnAction: MIDIAction?
+    @Published var midiBindings: [String: MIDIBinding] = MIDIBinding.loadAll() { didSet { MIDIBinding.saveAll(midiBindings) } }
     /// Pattern editor: grid cells become clickable.
     @Published var editingPattern = false
     /// Bumped whenever a user pattern changes (refreshes the grid and menus).
@@ -140,10 +153,10 @@ final class LooperController: ObservableObject {
     // MARK: Private
     private var timer: Timer?
     private var keyMonitor: Any?
-    private var lastLoopLength = 0
-    private var lastGeneration = 0
-    private var loading = false
-    private var needWave = true
+    var lastLoopLength = 0
+    var lastGeneration = 0
+    var loading = false
+    var needWave = true
     private var tickCount = 0
     private var messageItem: DispatchWorkItem?
     private var taps: [TimeInterval] = []
@@ -572,6 +585,7 @@ final class LooperController: ObservableObject {
         }
         if s.state == .armed { s.countdownBeats = Int((Double(c.countdown) / beatFrames).rounded(.up)) }
         if s != snapshot { snapshot = s }
+        songTick()
 
         // New loop just recorded → derive tempo / measure count (RC-5 style)
         if L != lastLoopLength {
@@ -763,7 +777,21 @@ final class LooperController: ObservableObject {
 
     // MARK: Memories
 
-    private func waitForCore() {
+    /// Loads tracks 2 and 3 of memory `i` (after the main loop is loaded).
+    private func loadTracks(of i: Int) {
+        for t in 0..<2 where store.hasTrack(i, t) {
+            let tr = core.sub(t)
+            core.send(.trackPrepareLoad(t))
+            waitForCore()
+            if let len = try? MemoryStore.readAudio(from: store.trackURL(i, t), left: tr.stack.baseL, right: tr.stack.baseR,
+                                                     capacity: tr.stack.capacity, sampleRate: core.sampleRate), len > 0 {
+                core.send(.trackSetLoaded(t, length: len))
+                waitForCore()
+            }
+        }
+    }
+
+    func waitForCore() {
         var n = 0
         while core.pendingCommands > 0 && n < 100 {
             usleep(3000)
@@ -779,6 +807,14 @@ final class LooperController: ObservableObject {
             return
         }
         loadMemory(target)
+    }
+
+    /// Loads memory `i` without asking about unsaved changes (song mode).
+    func jumpToMemory(_ i: Int) { loadMemory(max(0, min(MemoryStore.slotCount - 1, i))) }
+
+    func setMemoryIndexForSong(_ i: Int) {
+        memoryIndex = i
+        defaults.set(i, forKey: "lastMemory")
     }
 
     func memoryUp() { selectMemory(memoryIndex == MemoryStore.slotCount - 1 ? 0 : memoryIndex + 1) }
@@ -817,6 +853,7 @@ final class LooperController: ObservableObject {
                 core.loopTempo = settings.loopTempo > 0 ? settings.loopTempo : settings.tempo
                 if len > 0 { core.send(.setLoaded(length: len)) }
                 waitForCore()
+                if len > 0 { loadTracks(of: i) }
             } catch {
                 flash("Could not load memory: \(error.localizedDescription)")
             }
@@ -841,6 +878,14 @@ final class LooperController: ObservableObject {
                 try MemoryStore.writeWAV(to: store.audioURL(i), core: core, length: L)
             } else {
                 store.deleteAudio(i)
+            }
+            for t in 0..<2 {
+                let tr = core.sub(t)
+                if L > 0 && tr.hasContent {
+                    try MemoryStore.writeWAV(to: store.trackURL(i, t), stack: tr.stack, sampleRate: core.sampleRate, length: tr.length)
+                } else {
+                    try? FileManager.default.removeItem(at: store.trackURL(i, t))
+                }
             }
             try store.saveSettings(s, slot: i)
             memoryInfo[i] = store.info(i)
@@ -954,6 +999,20 @@ final class LooperController: ObservableObject {
             handleTransport(status)
             return
         }
+        if let action = midiLearnAction, let b = MIDIBinding.from(status: status, d1, d2) {
+            var m = midiBindings
+            for (k, v) in m where v == b { m[k] = nil }        // one message → one action
+            m[action.rawValue] = b
+            midiBindings = m
+            midiLearnAction = nil
+            flash("\(action.label) → \(b.label)")
+            return
+        }
+        for (key, b) in midiBindings {
+            guard let press = b.match(status: status, d1, d2), let action = MIDIAction(rawValue: key) else { continue }
+            performMIDI(action, press: press)
+            return
+        }
         let type = status & 0xF0
         switch type {
         case 0x90 where d2 > 0:
@@ -986,6 +1045,38 @@ final class LooperController: ObservableObject {
             selectMemory(Int(d1))
         default:
             break
+        }
+    }
+
+    /// Runs a learned MIDI action (press / release; most actions act on the press).
+    func performMIDI(_ a: MIDIAction, press: Bool) {
+        if a == .recordDub {
+            if press { pedalDown() } else { pedalUp() }
+            return
+        }
+        if a == .stop {
+            if press { stopDown() } else { stopUp() }
+            return
+        }
+        guard press else { return }
+        switch a {
+        case .playStop: playStop()
+        case .undo: undo()
+        case .redo: redo()
+        case .clear: clear()
+        case .rhythm: toggleRhythm()
+        case .tap: tapTempo()
+        case .variation: toggleVariation()
+        case .memoryUp: memoryUp()
+        case .memoryDown: memoryDown()
+        case .track2: trackPress(0)
+        case .track3: trackPress(1)
+        case .mute: toggleDrop()
+        case .fadeOut: fadeOut()
+        case .double: doubleLoop()
+        case .write: writeMemory()
+        case .song: if songActive { stopSong() } else { startSong() }
+        case .recordDub, .stop: break
         }
     }
 

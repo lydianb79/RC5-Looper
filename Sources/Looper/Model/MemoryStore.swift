@@ -14,6 +14,9 @@ final class MemoryStore {
 
     func dir(_ i: Int) -> URL { root.appendingPathComponent(String(format: "%02d", i + 1), isDirectory: true) }
     func audioURL(_ i: Int) -> URL { dir(i).appendingPathComponent("loop.wav") }
+    /// Tracks 2 and 3 (t = 0, 1).
+    func trackURL(_ i: Int, _ t: Int) -> URL { dir(i).appendingPathComponent("track\(t + 2).wav") }
+    func hasTrack(_ i: Int, _ t: Int) -> Bool { FileManager.default.fileExists(atPath: trackURL(i, t).path) }
     func settingsURL(_ i: Int) -> URL { dir(i).appendingPathComponent("settings.json") }
 
     func hasAudio(_ i: Int) -> Bool { FileManager.default.fileExists(atPath: audioURL(i).path) }
@@ -46,9 +49,23 @@ final class MemoryStore {
     // MARK: WAV I/O
 
     static func writeWAV(to url: URL, core: LoopCore, length: Int) throws {
+        try writeWAV(to: url, sampleRate: core.sampleRate, length: length) { start, n, l, r in
+            core.readMix(start: start, count: n, left: l, right: r)
+        }
+    }
+
+    static func writeWAV(to url: URL, stack: LayerStack, sampleRate: Double, length: Int) throws {
+        try writeWAV(to: url, sampleRate: sampleRate, length: length) { start, n, l, r in
+            stack.readMix(start: start, count: n, left: l, right: r)
+        }
+    }
+
+    /// Writes `length` frames supplied by `read` as a 32-bit float stereo WAV (atomically).
+    static func writeWAV(to url: URL, sampleRate: Double, length: Int,
+                         read: (Int, Int, UnsafeMutablePointer<Float>, UnsafeMutablePointer<Float>) -> Void) throws {
         let settings: [String: Any] = [
             AVFormatIDKey: kAudioFormatLinearPCM,
-            AVSampleRateKey: core.sampleRate,
+            AVSampleRateKey: sampleRate,
             AVNumberOfChannelsKey: 2,
             AVLinearPCMBitDepthKey: 32,
             AVLinearPCMIsFloatKey: true,
@@ -66,7 +83,7 @@ final class MemoryStore {
             var pos = 0
             while pos < length {
                 let n = min(chunk, length - pos)
-                core.readMix(start: pos, count: n, left: ch[0], right: ch[1])
+                read(pos, n, ch[0], ch[1])
                 buf.frameLength = AVAudioFrameCount(n)
                 try file.write(from: buf)
                 pos += n
@@ -83,12 +100,18 @@ final class MemoryStore {
     /// Reads any audio file Core Audio understands (WAV, AIFF, CAF, MP3, M4A…) into the loop base buffer.
     /// Must only be called while the core is in the empty state. Returns the loop length in frames.
     static func readAudio(from url: URL, into core: LoopCore) throws -> Int {
+        try readAudio(from: url, left: core.baseL, right: core.baseR, capacity: core.capacity, sampleRate: core.sampleRate)
+    }
+
+    /// Reads an audio file into the given buffers, converted to `sampleRate`. Returns the length in frames.
+    static func readAudio(from url: URL, left: UnsafeMutablePointer<Float>, right: UnsafeMutablePointer<Float>,
+                          capacity: Int, sampleRate: Double) throws -> Int {
         let file = try AVAudioFile(forReading: url)
         let fmt = file.processingFormat
         let total = Int(file.length)
         guard total > 0 else { return 0 }
-        let ratio = fmt.sampleRate / core.sampleRate          // file frames per loop frame
-        let outLen = min(core.capacity, Int(Double(total) / ratio))
+        let ratio = fmt.sampleRate / sampleRate          // file frames per loop frame
+        let outLen = min(capacity, Int(Double(total) / ratio))
         let need = min(total, Int(Double(outLen) * ratio) + 2)
         guard let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(need)) else {
             throw NSError(domain: "Looper", code: 3, userInfo: [NSLocalizedDescriptionKey: "File too large"])
@@ -103,8 +126,8 @@ final class MemoryStore {
         guard n > 0 else { return 0 }
         if abs(ratio - 1) < 1e-9 {
             let len = min(outLen, n)
-            core.baseL.update(from: c0, count: len)
-            core.baseR.update(from: c1, count: len)
+            left.update(from: c0, count: len)
+            right.update(from: c1, count: len)
             return len
         }
         var produced = 0
@@ -114,8 +137,8 @@ final class MemoryStore {
             if j >= n { break }
             let j1 = min(j + 1, n - 1)
             let f = Float(x - Double(j))
-            core.baseL[i] = c0[j] + (c0[j1] - c0[j]) * f
-            core.baseR[i] = c1[j] + (c1[j1] - c1[j]) * f
+            left[i] = c0[j] + (c0[j1] - c0[j]) * f
+            right[i] = c1[j] + (c1[j1] - c1[j]) * f
             produced = i + 1
         }
         return produced

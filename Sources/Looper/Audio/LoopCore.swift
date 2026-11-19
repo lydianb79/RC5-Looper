@@ -28,6 +28,8 @@ enum LoopCommand {
     case trackClear(Int)
     case trackStopDub(Int)
     case trackSetLoaded(Int, length: Int)
+    case trackPrepareLoad(Int)       // finish pending jobs so the base can be filled
+    case stopAtLoopEnd
     case armSwap(SwapInfo)
     case cancelSwap
 }
@@ -280,6 +282,7 @@ final class LoopCore {
                 else if state == .playing || state == .overdubbing {
                     playPos = reverse ? loopLength - 1 : 0
                     masterCycle = 0
+                    wrapCount = 0
                     syncStretch()
                     rhythm.reset()
                 }
@@ -311,6 +314,12 @@ final class LoopCore {
         case .trackClear(let t): sub(t).clear()
         case .trackStopDub(let t): sub(t).stopOverdub()
         case .trackSetLoaded(let t, let len): sub(t).setLoaded(length: len, mainLength: loopLength)
+        case .trackPrepareLoad(let t): sub(t).stack.finishAllJobs()
+        case .stopAtLoopEnd:
+            if state == .playing || state == .overdubbing {
+                if state == .overdubbing { state = .playing }
+                stopAtWrap = true
+            }
         case .armSwap(let info):
             pendingSwap = info
             if state != .playing && state != .overdubbing { applySwap() }
