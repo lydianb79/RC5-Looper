@@ -282,8 +282,8 @@ enum AppTheme: String, CaseIterable, Identifiable {
                            bgTop: Color(hex: 0xF3EFE6), bgMid: Color(hex: 0xEDE7DA), bgBottom: Color(hex: 0xE3DCCB),
                            glowA: Color(hex: 0xFFFFFF, opacity: 0.4), glowB: Color(hex: 0xE3DCCB, opacity: 0.4),
                            artColor: Color(hex: 0xD62828), artColor2: Color(hex: 0x1D3FAA),
-                           panel: Color(hex: 0xFBF9F4, opacity: 0.9), header: Color(hex: 0x1A1A1A, opacity: 0.96),
-                           lcd: Color(hex: 0x1A1A1A), control: Color(hex: 0xEBE5D8), controlHi: Color(hex: 0xDED6C5),
+                           panel: Color(hex: 0xFBF9F4, opacity: 0.92), header: Color(hex: 0xFBF9F4, opacity: 0.96),
+                           lcd: Color(hex: 0xEAE3D6), control: Color(hex: 0xEBE5D8), controlHi: Color(hex: 0xDED6C5),
                            well: Color(hex: 0xF2EDE3), wellAlt: Color(hex: 0xEAE3D6), track: Color(hex: 0xCFC6B3), dim: Color(hex: 0x9C927E),
                            line: Color(hex: 0xD9D1C0), line2: Color(hex: 0xC7BDA8),
                            text: Color(hex: 0x141414), text2: Color(hex: 0x3A3A3A), muted: Color(hex: 0x6E675A),
@@ -765,19 +765,19 @@ private struct ThemeArt: View {
             }
 
         case .bauhaus:
-            ctx.fill(Path(ellipseIn: CGRect(x: w * 0.72, y: h * 0.08, width: 260, height: 260)), with: .color(p.artColor.opacity(0.85)))
-            ctx.fill(Path(CGRect(x: w * 0.05, y: h * 0.62, width: 300, height: 300)), with: .color(p.artColor2.opacity(0.85)))
+            // large primary shapes at the edges, partly outside the window
+            ctx.fill(Path(ellipseIn: CGRect(x: w - 260, y: -140, width: 420, height: 420)), with: .color(p.artColor.opacity(0.55)))
+            ctx.fill(Path(CGRect(x: -120, y: h - 260, width: 360, height: 360)), with: .color(p.artColor2.opacity(0.5)))
             var tri = Path()
-            tri.move(to: CGPoint(x: w * 0.45, y: h * 0.95))
-            tri.addLine(to: CGPoint(x: w * 0.62, y: h * 0.6))
-            tri.addLine(to: CGPoint(x: w * 0.79, y: h * 0.95))
+            tri.move(to: CGPoint(x: w * 0.55, y: h + 20))
+            tri.addLine(to: CGPoint(x: w * 0.7, y: h - 230))
+            tri.addLine(to: CGPoint(x: w * 0.85, y: h + 20))
             tri.closeSubpath()
-            ctx.fill(tri, with: .color(Color(hex: 0xF2B705).opacity(0.9)))
-            ctx.fill(Path(CGRect(x: 0, y: h * 0.48, width: w, height: 10)), with: .color(Color(hex: 0x141414).opacity(0.85)))
-            ctx.fill(Path(CGRect(x: w * 0.33, y: 0, width: 10, height: h)), with: .color(Color(hex: 0x141414).opacity(0.85)))
+            ctx.fill(tri, with: .color(Color(hex: 0xF2B705).opacity(0.6)))
             var arcP = Path()
-            arcP.addArc(center: CGPoint(x: w * 0.2, y: h * 0.25), radius: 120, startAngle: .degrees(180), endAngle: .degrees(360), clockwise: false)
-            ctx.stroke(arcP, with: .color(Color(hex: 0x141414).opacity(0.85)), lineWidth: 18)
+            arcP.addArc(center: CGPoint(x: w * 0.42, y: -20), radius: 150, startAngle: .degrees(0), endAngle: .degrees(180), clockwise: false)
+            ctx.stroke(arcP, with: .color(Color(hex: 0x141414).opacity(0.35)), lineWidth: 14)
+            ctx.fill(Path(CGRect(x: w - 22, y: h * 0.35, width: 10, height: h * 0.4)), with: .color(Color(hex: 0x141414).opacity(0.4)))
 
         case .paper:
             for i in 0..<5 {
