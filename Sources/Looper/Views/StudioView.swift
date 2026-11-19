@@ -885,20 +885,33 @@ private struct RhythmPanel: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(width: 90)
+                .frame(width: 80)
+                Button { looper.editingPattern.toggle() } label: {
+                    Label(looper.editingPattern ? "Done" : "Edit pattern", systemImage: looper.editingPattern ? "checkmark" : "pencil")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(looper.editingPattern ? .white : UI.text)
+                        .padding(.horizontal, 10)
+                        .frame(height: 26)
+                        .background(RoundedRectangle(cornerRadius: 7).fill(looper.editingPattern ? UI.rhythm : UI.well))
+                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(looper.editingPattern ? UI.rhythm : UI.line2, lineWidth: 1))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .fixedSize()
+                .help("Pattern designer: click steps to cycle accent → normal → ghost → off. Built-in patterns are copied to your User patterns first.")
                 Spacer(minLength: 8)
                 HStack(spacing: 5) {
                     Text("Feel").font(.system(size: 11)).foregroundColor(UI.muted)
-                    Slider(value: $looper.settings.rhythmHumanize, in: 0...1).frame(width: 80)
+                    Slider(value: $looper.settings.rhythmHumanize, in: 0...1).frame(width: 70)
                         .help("Humanize: 0 = rigid drum machine, right = a drummer's natural timing and dynamics")
                 }
                 HStack(spacing: 5) {
                     Text("Room").font(.system(size: 11)).foregroundColor(UI.muted)
-                    Slider(value: $looper.settings.rhythmReverb, in: 0...1).frame(width: 70)
+                    Slider(value: $looper.settings.rhythmReverb, in: 0...1).frame(width: 60)
                 }
                 HStack(spacing: 5) {
                     Text("Level").font(.system(size: 11)).foregroundColor(UI.muted)
-                    Slider(value: $looper.settings.rhythmLevel, in: 0...2).frame(width: 90)
+                    Slider(value: $looper.settings.rhythmLevel, in: 0...2).frame(width: 80)
                 }
             }
             HStack(spacing: 10) {
@@ -915,12 +928,18 @@ private struct RhythmPanel: View {
                     }
                     .padding(.vertical, 2)
                 }
-                Spacer(minLength: 8)
-                ToggleChip(title: "Edit", isOn: $looper.editingPattern)
-                    .help("Edit the pattern: click steps to cycle accent → normal → ghost → off. Built-in patterns are copied to your User patterns first.")
-                ToggleChip(title: "Intro", isOn: $looper.settings.rhythmIntro)
-                ToggleChip(title: "Ending", isOn: $looper.settings.rhythmEnding)
-                ToggleChip(title: "Count-in", isOn: $looper.settings.countIn)
+                Rectangle().fill(UI.line2).frame(width: 1, height: 20)
+                HStack(spacing: 14) {
+                    Toggle("Intro", isOn: $looper.settings.rhythmIntro)
+                        .help("One bar count + fill before recording starts")
+                    Toggle("Ending", isOn: $looper.settings.rhythmEnding)
+                        .help("Stop plays a fill and a final hit on the next bar line")
+                    Toggle("Count-in", isOn: $looper.settings.countIn)
+                        .help("Count before recording (metronome clicks when the rhythm is off)")
+                }
+                .toggleStyle(.checkbox)
+                .font(.system(size: 12))
+                .fixedSize()
             }
             if looper.editingPattern {
                 Text(looper.currentIsUserPattern
