@@ -10,10 +10,13 @@ VERSION=$(grep -o 'static let version = "[^"]*"' Sources/Looper/Model/LooperCont
 BUILD_NO=$(git rev-list --count HEAD 2>/dev/null || date +%Y%m%d%H%M)
 OUT="build/$VERSION"
 mkdir -p "$OUT"
+LOG="$OUT/build.log"
+: > "$LOG"
 
 for ARCH in arm64 x86_64; do
   echo "▶︎ Building $ARCH …"
-  swift build -c release --arch "$ARCH"
+  swift build -c release --arch "$ARCH" 2>&1 | tee -a "$LOG"
+  [[ ${PIPESTATUS[0]} -eq 0 ]] || { echo "❌ Build failed – see $LOG"; exit 1; }
   BIN="$(swift build -c release --arch "$ARCH" --show-bin-path)/Looper"
   APP="$OUT/Looper ($ARCH).app"
   rm -rf "$APP"
@@ -29,6 +32,9 @@ for ARCH in arm64 x86_64; do
   (cd "$OUT" && rm -f "Looper-$VERSION-$ARCH.zip" && ditto -c -k --keepParent "Looper ($ARCH).app" "Looper-$VERSION-$ARCH.zip")
   echo "✅ $APP"
 done
+
+WARN=$(grep -E "warning:" "$LOG" | sort -u | wc -l | tr -d ' ')
+echo "ℹ︎ $WARN compiler warning(s) – full log: $LOG"
 
 if [[ "${1:-}" == "--open" ]]; then
   HOST=$(uname -m)
